@@ -69,12 +69,6 @@ export class GeneratorPanel {
     private readonly panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri
   ) {
-    this.panel.webview.html = renderHtml(
-      this.panel.webview,
-      extensionUri,
-      randomBytes(24).toString('base64url')
-    );
-
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.panel.webview.onDidReceiveMessage(
       (message: WebviewToHost) => void this.onMessage(message),
@@ -87,6 +81,13 @@ export class GeneratorPanel {
           this.postSettings();
         }
       })
+    );
+
+    // 先注册消息监听，再加载页面，避免错过 webview 启动时发送的 ready。
+    this.panel.webview.html = renderHtml(
+      this.panel.webview,
+      extensionUri,
+      randomBytes(24).toString('base64url')
     );
   }
 
