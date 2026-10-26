@@ -1,0 +1,107 @@
+{
+  "name": "nmea-gps-generator",
+  "displayName": "NMEA GPS Generator",
+  "description": "在 OpenStreetMap 或 Google 浅色地图上手动绘制 GPS 轨迹，并生成带校验和的 NMEA（GGA/GSA/RMC）日志与 CSV 坐标文件。",
+  "version": "0.1.0",
+  "publisher": "local-dev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xionghuibing/nmea-gps-generator.git"
+  },
+  "homepage": "https://github.com/xionghuibing/nmea-gps-generator#readme",
+  "bugs": {
+    "url": "https://github.com/xionghuibing/nmea-gps-generator/issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "nmea",
+    "gps",
+    "gnss",
+    "track",
+    "generator",
+    "openstreetmap",
+    "google maps"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "nmeaGen.open",
+        "title": "打开 NMEA 轨迹生成器",
+        "category": "NMEA"
+      },
+      {
+        "command": "nmeaGen.setApiKey",
+        "title": "设置 Google Maps API Key",
+        "category": "NMEA"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "nmeaGen.open"
+        },
+        {
+          "command": "nmeaGen.setApiKey"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "NMEA GPS Generator",
+      "properties": {
+        "nmeaGen.mapProvider": {
+          "type": "string",
+          "enum": [
+            "osm",
+            "google"
+          ],
+          "enumDescriptions": [
+            "Leaflet + OpenStreetMap 瓦片（默认，无需 API Key）",
+            "Google Maps JavaScript API（需要 API Key 与结算账号）"
+          ],
+          "default": "osm",
+          "description": "底图提供商。两种底图都固定使用浅色模式。"
+        },
+        "nmeaGen.tileUrl": {
+          "type": "string",
+          "default": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+          "markdownDescription": "OSM 底图的 XYZ 瓦片模板，必须是 HTTPS 且包含 `{z}`、`{x}`、`{y}`。修改前请确认目标服务的条款与署名要求。"
+        },
+        "nmeaGen.tileAttribution": {
+          "type": "string",
+          "default": "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
+          "description": "OSM 底图右下角显示的署名（可含 HTML 链接），请勿移除或隐藏。"
+        },
+        "nmeaGen.googleMapsApiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Google Maps JavaScript API Key，仅在 `nmeaGen.mapProvider` 为 `google` 时使用。需要启用 **Maps JavaScript API** 并绑定结算账号。也可以通过环境变量 `NMEA_GOOGLE_MAPS_API_KEY` 提供。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "node esbuild.js --production",
+    "typecheck": "tsc --noEmit",
+    "test": "node esbuild.js --test && node --test out-test/generator.test.cjs",
+    "vscode:prepublish": "npm run package"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.2",
+    "leaflet": "^1.9.4",
+    "typescript": "^5.4.5"
+  }
+}
