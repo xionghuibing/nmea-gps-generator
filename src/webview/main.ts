@@ -900,6 +900,10 @@ function bindEvents(): void {
   window.addEventListener('message', handleHostMessage);
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('resize', () => view?.invalidateSize());
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(() => view?.invalidateSize());
+    observer.observe(ui.map);
+  }
   window.gm_authFailure = () => {
     showBanner(
       'Google Maps 鉴权失败：请检查 API Key、Maps JavaScript API 与结算设置。',

@@ -160,8 +160,8 @@ export function parseCsvCoordinates(text: string): CsvImportResult {
   let sawData = false;
 
   const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
-  for (let index = 0; index < lines.length; index++) {
-    const trimmed = lines[index].trim();
+  for (const line of lines) {
+    const trimmed = line.trim();
     if (trimmed.length === 0 || trimmed.startsWith('#')) {
       continue;
     }
@@ -177,8 +177,8 @@ export function parseCsvCoordinates(text: string): CsvImportResult {
       Math.abs(lon) <= 180;
 
     if (!valid) {
-      // 第一行经常是表头，不视为错误。
-      if (!sawData && index === 0) {
+      // 数据开始前的行通常是表头或说明，不视为错误。
+      if (!sawData) {
         continue;
       }
       skipped++;
