@@ -1,5 +1,7 @@
 # NMEA GPS Generator
 
+[![CI](https://github.com/xionghuibing/nmea-gps-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/xionghuibing/nmea-gps-generator/actions/workflows/ci.yml)
+
 在 VS Code 里手动绘制 GPS 轨迹，并生成带校验和的 **NMEA 0183** 日志（GGA / GSA / RMC）与 CSV 坐标文件。交互参考 [nmeagen.org](https://nmeagen.org/)，但完全运行在 VS Code Webview 中，方便为 GPS 仿真、日志回放、地图匹配等场景快速准备测试数据。
 
 - 底图默认 **OpenStreetMap（Leaflet，免 API Key）**，可切换 **Google Maps**。
