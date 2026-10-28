@@ -1,5 +1,9 @@
 :root {
   color-scheme: light dark;
+  --panel-pad: 14px;
+  /* 不用 --vscode-sideBarSectionHeader-background：默认主题里它等于侧栏底色，灰条会不可见。 */
+  --section-header-bg: rgba(128, 128, 128, 0.18);
+  --section-header-fg: var(--vscode-sideBarSectionHeader-foreground, var(--vscode-foreground));
 }
 
 * {
@@ -31,7 +35,7 @@ body {
   width: 352px;
   flex: 0 0 352px;
   overflow-y: auto;
-  padding: 0 14px 24px;
+  padding: 0 var(--panel-pad) 24px;
   border-right: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
@@ -57,69 +61,31 @@ body {
   background: #eef1f5;
 }
 
-.app-header {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 14px 0 10px;
-  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
-}
-
-h1 {
-  margin: 0 0 2px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.subtitle {
-  margin: 0;
-  font-size: 11px;
-  opacity: 0.65;
-}
-
-.version-pill {
-  flex: 0 0 auto;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  white-space: nowrap;
-  background: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
-}
-
 .section {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.16));
+  padding: 10px 0;
 }
 
+/* 分区标签：横向铺满侧边栏的浅灰条，取消分区之间的分隔线。 */
 .section h2 {
-  margin: 0 0 8px;
+  margin: 0 calc(-1 * var(--panel-pad)) 8px;
+  padding: 5px var(--panel-pad);
+  background: var(--section-header-bg);
+  color: var(--section-header-fg);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  opacity: 0.7;
-}
-
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.section-head h2 {
-  margin-bottom: 0;
 }
 
 .tool-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
+}
+
+/* 5 个工具时让最后一个按钮占满剩余两列，避免出现空位。 */
+.tool-grid > .tool:last-child {
+  grid-column: span 2;
 }
 
 button {
@@ -287,23 +253,6 @@ input[type='checkbox'] {
   color: var(--vscode-foreground);
 }
 
-.point-title {
-  margin: 8px 0;
-  font-weight: 600;
-}
-
-.nav-buttons {
-  display: flex;
-  gap: 4px;
-}
-
-.icon-button {
-  width: 24px;
-  height: 22px;
-  padding: 0;
-  font-size: 12px;
-}
-
 .button-row {
   display: flex;
   gap: 6px;
@@ -319,41 +268,24 @@ input[type='checkbox'] {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-top: 14px;
+  padding-top: 12px;
 }
 
+/* 标签靠左、选框靠右：一行撑满并占据一半宽度。 */
 .select-field {
+  width: 100%;
   flex-direction: row;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   font-size: 11px;
   color: var(--vscode-descriptionForeground);
 }
 
 .select-field select {
-  flex: 1 1 auto;
-}
-
-.link-button {
-  width: auto;
-  padding: 0;
-  border: none;
-  text-align: left;
-  font-size: 11px;
-  color: var(--vscode-textLink-foreground);
-  background: transparent;
-}
-
-.link-button:hover:not(:disabled) {
-  background: transparent;
-  text-decoration: underline;
-}
-
-.attribution-note {
-  margin: 2px 0 0;
-  font-size: 10px;
-  line-height: 1.5;
-  opacity: 0.55;
+  flex: 0 0 50%;
+  width: 50%;
+  max-width: none;
 }
 
 .map-status {
@@ -483,20 +415,33 @@ input[type='checkbox'] {
 }
 
 @media (max-width: 760px) {
+  /* 活动栏视图（侧边栏）较窄：地图固定在顶部，表单在下方单独滚动。 */
+  :root {
+    --panel-pad: 12px;
+  }
+
   #app {
     flex-direction: column;
   }
 
-  #sidebar {
-    width: 100%;
-    flex: 0 0 auto;
-    max-height: 52vh;
-    border-right: none;
-    border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+  #map-pane {
+    order: -1;
+    flex: 0 0 42vh;
+    min-height: 240px;
   }
 
-  #map-pane {
-    min-height: 48vh;
+  #sidebar {
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    padding: 0 var(--panel-pad) 20px;
+    border-right: none;
+    border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+  }
+
+  .section {
+    padding: 8px 0;
   }
 }
 

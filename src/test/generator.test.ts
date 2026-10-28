@@ -17,12 +17,7 @@ import {
   linePoints,
   pathLength
 } from '../shared/geo';
-import {
-  createDefaultSettings,
-  parsePersistedState,
-  parseProject,
-  serializeProject
-} from '../webview/settings';
+import { parsePersistedState } from '../webview/settings';
 
 const START = Date.UTC(2024, 0, 2, 3, 4, 5);
 const BUDAPEST_A = { lat: 47.4979, lon: 19.0402 };
@@ -186,15 +181,7 @@ test('CSV 导出与导入', () => {
   assert.ok(parsed.warnings.some((warning) => warning.includes('跳过')));
 });
 
-test('工程 JSON 可往返，并过滤非法点', () => {
-  const settings = createDefaultSettings();
-  settings.frequencyHz = 2.5;
-  const text = serializeProject([BUDAPEST_A, BUDAPEST_B], settings);
-  const project = parseProject(text);
-  assert.ok(project !== null);
-  assert.equal(project.points.length, 2);
-  assert.equal(project.settings.frequencyHz, 2.5);
-
+test('持久化状态会过滤非法点并校正选中索引', () => {
   const restored = parsePersistedState({
     points: [
       { lat: 100, lon: 0 },

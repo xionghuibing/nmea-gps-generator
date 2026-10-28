@@ -181,8 +181,13 @@ export class GoogleMapView implements MapView {
     this.map.fitBounds(bounds, 48);
   }
 
+  /** “移动点”工具下为选中的点叠加一个可拖动的橙色标记。 */
   private drawSelected(state: MapRenderState): void {
-    if (state.selectedIndex < 0 || state.selectedIndex >= state.points.length) {
+    if (
+      state.tool !== 'move' ||
+      state.selectedIndex < 0 ||
+      state.selectedIndex >= state.points.length
+    ) {
       return;
     }
     const index = state.selectedIndex;
@@ -191,25 +196,23 @@ export class GoogleMapView implements MapView {
       map: this.map,
       position: { lat: point.lat, lng: point.lon },
       icon: dotIcon('#f59e0b', 9),
-      draggable: state.tool === 'move',
+      draggable: true,
       zIndex: 1000,
-      title: state.tool === 'move' ? '拖动调整位置' : '选中点'
+      title: '拖动调整位置'
     });
     this.add(marker);
 
-    if (state.tool === 'move') {
-      this.markerListeners.push(
-        marker.addListener('dragstart', () => this.handlers?.pointDragStart(index))
-      );
-      this.markerListeners.push(
-        marker.addListener('dragend', () => {
-          const position = marker.getPosition();
-          if (position) {
-            this.handlers?.pointDragEnd(index, { lat: position.lat(), lon: position.lng() });
-          }
-        })
-      );
-    }
+    this.markerListeners.push(
+      marker.addListener('dragstart', () => this.handlers?.pointDragStart(index))
+    );
+    this.markerListeners.push(
+      marker.addListener('dragend', () => {
+        const position = marker.getPosition();
+        if (position) {
+          this.handlers?.pointDragEnd(index, { lat: position.lat(), lon: position.lng() });
+        }
+      })
+    );
   }
 
   private drawPreview(state: MapRenderState): void {
@@ -264,8 +267,7 @@ export class GoogleMapView implements MapView {
       return;
     }
     const latlng: LatLng = { lat: event.latLng.lat(), lon: event.latLng.lng() };
-    const wantsPoint =
-      this.state.tool === 'delete' || this.state.tool === 'move' || this.state.tool === 'edit';
+    const wantsPoint = this.state.tool === 'delete' || this.state.tool === 'move';
     if (wantsPoint) {
       const index = this.nearestIndex(event.latLng);
       if (index >= 0) {

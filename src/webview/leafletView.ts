@@ -179,37 +179,31 @@ export class LeafletMapView implements MapView {
     this.map.fitBounds(bounds, { padding: [48, 48], maxZoom: 17 });
   }
 
+  /** “移动点”工具下为选中的点叠加一个可拖动的橙色标记。 */
   private drawSelected(state: MapRenderState): void {
-    if (!this.trackLayer || state.selectedIndex < 0 || state.selectedIndex >= state.points.length) {
+    if (
+      state.tool !== 'move' ||
+      !this.trackLayer ||
+      state.selectedIndex < 0 ||
+      state.selectedIndex >= state.points.length
+    ) {
       return;
     }
     const index = state.selectedIndex;
     const point = state.points[index];
 
-    if (state.tool === 'move') {
-      const marker = L.marker([point.lat, point.lon], {
-        icon: circleIcon('#f59e0b', 8),
-        draggable: true,
-        keyboard: false,
-        zIndexOffset: 1000,
-        title: '拖动调整位置'
-      }).addTo(this.trackLayer);
-      marker.on('dragstart', () => this.handlers?.pointDragStart(index));
-      marker.on('dragend', () => {
-        const position = marker.getLatLng();
-        this.handlers?.pointDragEnd(index, { lat: position.lat, lon: position.lng });
-      });
-      return;
-    }
-
-    L.circleMarker([point.lat, point.lon], {
-      radius: 8,
-      color: '#f59e0b',
-      weight: 3,
-      fillColor: '#ffffff',
-      fillOpacity: 0.95,
-      interactive: false
+    const marker = L.marker([point.lat, point.lon], {
+      icon: circleIcon('#f59e0b', 8),
+      draggable: true,
+      keyboard: false,
+      zIndexOffset: 1000,
+      title: '拖动调整位置'
     }).addTo(this.trackLayer);
+    marker.on('dragstart', () => this.handlers?.pointDragStart(index));
+    marker.on('dragend', () => {
+      const position = marker.getLatLng();
+      this.handlers?.pointDragEnd(index, { lat: position.lat, lon: position.lng });
+    });
   }
 
   private drawPreview(state: MapRenderState): void {
@@ -252,8 +246,7 @@ export class LeafletMapView implements MapView {
       return;
     }
     const latlng: LatLng = { lat: event.latlng.lat, lon: event.latlng.lng };
-    const wantsPoint =
-      this.state.tool === 'delete' || this.state.tool === 'move' || this.state.tool === 'edit';
+    const wantsPoint = this.state.tool === 'delete' || this.state.tool === 'move';
     if (wantsPoint) {
       const index = this.nearestIndex(event.containerPoint);
       if (index >= 0) {

@@ -37,21 +37,12 @@ export function renderHtml(
 <body>
   <div id="app">
     <aside id="sidebar">
-      <header class="app-header">
-        <div>
-          <h1>NMEA GPS Generator</h1>
-          <p class="subtitle">绘制轨迹 · 生成 NMEA / CSV</p>
-        </div>
-        <span class="version-pill">浅色底图</span>
-      </header>
-
       <section class="section">
         <h2>绘制工具</h2>
         <div class="tool-grid" id="tool-grid">
           <button class="tool active" data-tool="add" title="点击地图在轨迹末尾追加点">＋ 添加点</button>
           <button class="tool" data-tool="delete" title="点击轨迹点将其删除">⌫ 删除点</button>
-          <button class="tool" data-tool="move" title="选中点后拖动橙色标记">✥ 移动点</button>
-          <button class="tool" data-tool="edit" title="选中点并输入精确经纬度">✎ 编辑点</button>
+          <button class="tool" data-tool="move" title="点击轨迹点选中后拖动橙色标记">✥ 移动点</button>
           <button class="tool" data-tool="line" title="从最后一个点向鼠标位置添加等间距点">⟋ 多点直线</button>
           <button class="tool" data-tool="pan" title="拖动、缩放地图，不添加点">✋ 浏览</button>
         </div>
@@ -65,37 +56,13 @@ export function renderHtml(
       </section>
 
       <section class="section">
-        <div class="section-head">
-          <h2>选中的点</h2>
-          <div class="nav-buttons">
-            <button class="icon-button" id="prev-point" title="上一个点" aria-label="上一个点">↑</button>
-            <button class="icon-button" id="next-point" title="下一个点" aria-label="下一个点">↓</button>
-          </div>
-        </div>
-        <p class="point-title" id="point-title">未选择点</p>
-        <div class="field-row two">
-          <label>纬度
-            <input id="point-lat" type="number" step="0.0000001" min="-90" max="90" disabled />
-          </label>
-          <label>经度
-            <input id="point-lon" type="number" step="0.0000001" min="-180" max="180" disabled />
-          </label>
-        </div>
-        <div class="button-row">
-          <button id="apply-point" disabled>应用坐标</button>
-          <button id="delete-point" class="danger" disabled>删除此点</button>
-        </div>
-        <p class="hint" id="point-meta">点击轨迹上的点进行选择；改坐标后按 Enter 或“应用坐标”。</p>
-      </section>
-
-      <section class="section">
         <h2>运动与时间</h2>
         <div class="field-row two">
           <label>GPS 频率（Hz）
             <input id="frequency" type="number" min="0.1" max="50" step="0.1" />
           </label>
-          <label>对象速度（m/s）
-            <input id="speed" type="number" min="0.01" max="100" step="0.1" />
+          <label>对象速度（km/h）
+            <input id="speed" type="number" min="0.1" max="360" step="1" />
           </label>
         </div>
         <p class="hint" id="spacing-hint"></p>
@@ -152,10 +119,6 @@ export function renderHtml(
           <button id="import-nmea">导入 NMEA…</button>
           <button id="import-csv">导入 CSV…</button>
         </div>
-        <div class="button-row two-buttons">
-          <button id="save-project">保存工程…</button>
-          <button id="open-project">打开工程…</button>
-        </div>
         <div class="button-row three-buttons">
           <button id="undo" disabled>撤销</button>
           <button id="redo" disabled>重做</button>
@@ -170,11 +133,6 @@ export function renderHtml(
             <option value="google">Google Maps</option>
           </select>
         </label>
-        <p class="hint" id="provider-hint">OpenStreetMap · 浅色底图</p>
-        <button id="api-key" class="link-button">设置 Google Maps API Key</button>
-        <p class="attribution-note">
-          底图仅使用浅色模式。OSM 数据 © OpenStreetMap contributors，请遵守其署名与使用条款。
-        </p>
       </footer>
     </aside>
 

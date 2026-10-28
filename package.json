@@ -2,7 +2,7 @@
   "name": "nmea-gps-generator",
   "displayName": "NMEA GPS Generator",
   "description": "在 OpenStreetMap 或 Google 浅色地图上手动绘制 GPS 轨迹，并生成带校验和的 NMEA（GGA/GSA/RMC）日志与 CSV 坐标文件。",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "local-dev",
   "license": "MIT",
   "repository": {
@@ -30,18 +30,38 @@
     "google maps"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "nmeaGen",
+          "title": "NMEA GPS Generator",
+          "icon": "media/nmea-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "nmeaGen": [
+        {
+          "type": "webview",
+          "id": "nmeaGen.generatorView",
+          "name": "",
+          "icon": "media/nmea-icon.svg",
+          "contextualTitle": "NMEA GPS Generator"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "nmeaGen.open",
-        "title": "打开 NMEA 轨迹生成器",
+        "title": "在侧边栏打开 NMEA 轨迹生成器",
         "category": "NMEA"
       },
       {
         "command": "nmeaGen.setApiKey",
         "title": "设置 Google Maps API Key",
-        "category": "NMEA"
+        "category": "NMEA",
+        "icon": "$(key)"
       }
     ],
     "menus": {
@@ -51,6 +71,13 @@
         },
         {
           "command": "nmeaGen.setApiKey"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "nmeaGen.setApiKey",
+          "when": "view == nmeaGen.generatorView",
+          "group": "navigation@1"
         }
       ]
     },

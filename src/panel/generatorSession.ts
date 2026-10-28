@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { randomBytes } from 'node:crypto';
-import { renderHtml } from './html';
 import {
   DEFAULT_TILE_ATTRIBUTION,
   DEFAULT_TILE_URL,
@@ -18,32 +16,28 @@ import type {
 
 const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
 
-export class GeneratorPanel {
-  private static current: GeneratorPanel | undefined;
-
+/**
+ * 承载单个 Webview（活动栏侧边栏视图）的宿主逻辑。
+ *
+ * 与展示形式无关的部分（文件读写、剪贴板、配置同步）都放在这里，
+ * 视图提供者只负责创建/销毁 Webview 与 HTML。
+ */
+export class GeneratorSession {
   private readonly disposables: vscode.Disposable[] = [];
-  private disposed = false;
 
-  public static createOrShow(extensionUri: vscode.Uri): void {
-    if (GeneratorPanel.current) {
-      GeneratorPanel.current.panel.reveal();
-      return;
-    }
-
-    const panel = vscode.window.createWebviewPanel(
-      'nmeaGen.panel',
-      'NMEA GPS Generator',
-      vscode.ViewColumn.Active,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
-      }
+  constructor(private readonly webview: vscode.Webview) {
+    // 必须在加载 HTML 之前完成注册，避免错过 webview 启动时发送的 ready。
+    this.disposables.push(
+      webview.onDidReceiveMessage((message: WebviewToHost) => void this.onMessage(message)),
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('nmeaGen')) {
+          this.postSettings();
+        }
+      })
     );
-    GeneratorPanel.current = new GeneratorPanel(panel, extensionUri);
   }
 
-  /** 命令面板也直接调用；即使面板未打开也能写入配置。 */
+  /** 命令面板与视图标题栏都直接调用；即使视图未打开也能写入配置。 */
   public static async promptForApiKey(): Promise<void> {
     const config = vscode.workspace.getConfiguration('nmeaGen');
     const value = await vscode.window.showInputBox({
@@ -57,37 +51,10 @@ export class GeneratorPanel {
       return;
     }
     await config.update('googleMapsApiKey', value.trim(), vscode.ConfigurationTarget.Global);
-    GeneratorPanel.current?.postSettings();
     void vscode.window.showInformationMessage(
       value.trim().length > 0
         ? '已保存 Google Maps API Key。将底图切换为 Google Maps 后生效。'
         : '已清除 Google Maps API Key。'
-    );
-  }
-
-  private constructor(
-    private readonly panel: vscode.WebviewPanel,
-    extensionUri: vscode.Uri
-  ) {
-    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-    this.panel.webview.onDidReceiveMessage(
-      (message: WebviewToHost) => void this.onMessage(message),
-      null,
-      this.disposables
-    );
-    this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration('nmeaGen')) {
-          this.postSettings();
-        }
-      })
-    );
-
-    // 先注册消息监听，再加载页面，避免错过 webview 启动时发送的 ready。
-    this.panel.webview.html = renderHtml(
-      this.panel.webview,
-      extensionUri,
-      randomBytes(24).toString('base64url')
     );
   }
 
@@ -114,7 +81,7 @@ export class GeneratorPanel {
           this.postSettings();
           break;
         case 'setApiKey':
-          await GeneratorPanel.promptForApiKey();
+          await GeneratorSession.promptForApiKey();
           break;
         case 'openSettings':
           await vscode.commands.executeCommand('workbench.action.openSettings', 'nmeaGen');
@@ -132,7 +99,7 @@ export class GeneratorPanel {
 
   private postSettings(): void {
     const message: HostToWebview = { type: 'settings', settings: this.readSettings() };
-    void this.panel.webview.postMessage(message);
+    void this.webview.postMessage(message);
   }
 
   private readSettings(): HostSettings {
@@ -158,13 +125,9 @@ export class GeneratorPanel {
     content: string,
     suggestedName: string
   ): Promise<void> {
-    const extension = kind === 'nmea' ? 'nmea' : kind === 'csv' ? 'csv' : 'json';
+    const extension = kind === 'nmea' ? 'nmea' : 'csv';
     const filters: Record<string, string[]> =
-      kind === 'nmea'
-        ? { 'NMEA 日志': ['nmea'] }
-        : kind === 'csv'
-          ? { 'CSV 坐标': ['csv'] }
-          : { 'NMEA GPS Generator 工程': ['json'] };
+      kind === 'nmea' ? { 'NMEA 日志': ['nmea'] } : { 'CSV 坐标': ['csv'] };
 
     const target = await vscode.window.showSaveDialog({
       defaultUri: this.defaultFileUri(suggestedName, extension),
@@ -189,9 +152,7 @@ export class GeneratorPanel {
     const filters: Record<string, string[]> =
       kind === 'nmea'
         ? { 'NMEA 日志': ['nmea', 'log', 'gps', 'txt'], '所有文件': ['*'] }
-        : kind === 'csv'
-          ? { 'CSV / 文本坐标': ['csv', 'txt'], '所有文件': ['*'] }
-          : { '工程 JSON': ['json'], '所有文件': ['*'] };
+        : { 'CSV / 文本坐标': ['csv', 'txt'], '所有文件': ['*'] };
 
     const selection = await vscode.window.showOpenDialog({
       canSelectMany: false,
@@ -216,7 +177,7 @@ export class GeneratorPanel {
       fileName: path.basename(uri.fsPath),
       content: Buffer.from(bytes).toString('utf8')
     };
-    void this.panel.webview.postMessage(message);
+    void this.webview.postMessage(message);
   }
 
   private async openExternal(rawUrl: string): Promise<void> {
@@ -237,15 +198,9 @@ export class GeneratorPanel {
       : vscode.Uri.file(path.join(os.homedir(), fileName));
   }
 
-  private dispose(): void {
-    if (this.disposed) {
-      return;
-    }
-    this.disposed = true;
-    GeneratorPanel.current = undefined;
+  public dispose(): void {
     while (this.disposables.length > 0) {
       this.disposables.pop()?.dispose();
     }
-    this.panel.dispose();
   }
 }

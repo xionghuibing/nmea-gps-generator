@@ -5,7 +5,13 @@
       "name": "运行扩展",
       "type": "extensionHost",
       "request": "launch",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        // 把本工程作为文件夹在开发宿主中打开：
+        // 1) 宿主窗口拥有独立的窗口身份，不再落到所有开发宿主共享的 ext-dev 存储；
+        // 2) 避免复用上一次调试（例如 NMEA GPS Visualizer）留下的编辑器/视图热退状态。
+        "${workspaceFolder}"
+      ],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "preLaunchTask": "npm: compile"
     }

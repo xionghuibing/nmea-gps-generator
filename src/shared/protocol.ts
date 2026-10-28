@@ -1,6 +1,6 @@
 export type MapProvider = 'osm' | 'google';
 
-export type FileKind = 'nmea' | 'csv' | 'project';
+export type FileKind = 'nmea' | 'csv';
 
 export interface HostSettings {
   provider: MapProvider;

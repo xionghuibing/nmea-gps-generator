@@ -4,7 +4,8 @@ import type { TalkerId } from '../nmea/generator';
 
 export interface Settings {
   frequencyHz: number;
-  speedMps: number;
+  /** 对象速度，单位 km/h（用于推算点间距）。 */
+  speedKmh: number;
   /** UTC 起始日期，格式 YYYY-MM-DD。 */
   startDate: string;
   /** UTC 起始时间，格式 HH:MM:SS。 */
@@ -31,7 +32,7 @@ export function createDefaultSettings(): Settings {
   const now = new Date();
   return {
     frequencyHz: 1,
-    speedMps: 1.4,
+    speedKmh: 50,
     startDate: utcDateString(now.getTime()),
     startTime: utcTimeString(now.getTime()),
     talkerId: 'GP',
@@ -46,11 +47,12 @@ export function createDefaultSettings(): Settings {
 }
 
 /** 点间距 = 速度 / 频率；多点直线工具使用该值。 */
+/** 点间距 = 速度（km/h 换算为 m/s）/ 频率；多点直线工具使用该值。 */
 export function spacingMeters(settings: Settings): number {
   if (!Number.isFinite(settings.frequencyHz) || settings.frequencyHz <= 0) {
     return 0;
   }
-  return Math.max(0.01, settings.speedMps / settings.frequencyHz);
+  return Math.max(0.01, settings.speedKmh / 3.6 / settings.frequencyHz);
 }
 
 export function startEpochMs(settings: Settings): number {
@@ -167,32 +169,6 @@ export function parsePersistedState(value: unknown): PersistedState | null {
   return { points, settings, selectedIndex };
 }
 
-/** 打开工程 JSON（格式与持久化状态一致）。 */
-export function parseProject(text: string): PersistedState | null {
-  try {
-    const parsed = JSON.parse(text) as Record<string, unknown>;
-    if (parsed === null || typeof parsed !== 'object') {
-      return null;
-    }
-    return parsePersistedState(parsed);
-  } catch {
-    return null;
-  }
-}
-
-export function serializeProject(points: readonly LatLng[], settings: Settings): string {
-  return `${JSON.stringify(
-    {
-      format: 'nmea-gps-generator',
-      version: 1,
-      points,
-      settings
-    },
-    null,
-    2
-  )}\n`;
-}
-
 function parseSettings(value: unknown): Settings | null {
   if (value === null || typeof value !== 'object') {
     return null;
@@ -217,7 +193,7 @@ function parseSettings(value: unknown): Settings | null {
 
   return {
     frequencyHz: round(clamp(numberOr(raw.frequencyHz, defaults.frequencyHz), 0.1, 50), 3),
-    speedMps: round(clamp(numberOr(raw.speedMps, defaults.speedMps), 0.01, 100), 3),
+    speedKmh: round(clamp(numberOr(raw.speedKmh, defaults.speedKmh), 0.1, 360), 1),
     startDate: validStart ? startDate : defaults.startDate,
     startTime: validStart ? startTime : defaults.startTime,
     talkerId,

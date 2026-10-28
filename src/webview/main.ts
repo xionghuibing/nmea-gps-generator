@@ -29,14 +29,8 @@ import {
 } from './mapView';
 import {
   createDefaultSettings,
-  formatUtcStamp,
   parsePersistedState,
-  parseProject,
   parseUtcDateTime,
-  pointDistanceMeters,
-  pointSpeedMps,
-  pointTimeMs,
-  serializeProject,
   spacingMeters,
   startEpochMs,
   TALKER_IDS,
@@ -62,8 +56,7 @@ declare global {
 const TOOL_HINTS: Record<Tool, string> = {
   add: '点击地图在轨迹末尾追加点',
   delete: '点击轨迹点将其删除',
-  move: '点击选择点，然后拖动橙色标记调整位置',
-  edit: '点击轨迹点，在左侧输入精确经纬度',
+  move: '点击轨迹点选中，然后拖动橙色标记调整位置',
   line: '从最后一个点开始：移动鼠标预览，点击地图添加等间距点',
   pan: '拖动 / 滚轮浏览地图，不会添加点'
 };
@@ -101,7 +94,6 @@ let pendingPointer: LatLng | null = null;
 let pointerFrame = 0;
 let toastTimer = 0;
 let bannerAction: (() => void) | null = null;
-let lastFilledIndex = -2;
 
 const ui = {
   map: byId<HTMLDivElement>('map'),
@@ -110,14 +102,6 @@ const ui = {
   toolHint: byId<HTMLParagraphElement>('tool-hint'),
   stats: byId<HTMLDivElement>('stats'),
   statsHint: byId<HTMLParagraphElement>('stats-hint'),
-  pointTitle: byId<HTMLParagraphElement>('point-title'),
-  pointLat: byId<HTMLInputElement>('point-lat'),
-  pointLon: byId<HTMLInputElement>('point-lon'),
-  pointMeta: byId<HTMLParagraphElement>('point-meta'),
-  applyPoint: byId<HTMLButtonElement>('apply-point'),
-  deletePoint: byId<HTMLButtonElement>('delete-point'),
-  prevPoint: byId<HTMLButtonElement>('prev-point'),
-  nextPoint: byId<HTMLButtonElement>('next-point'),
   frequency: byId<HTMLInputElement>('frequency'),
   speed: byId<HTMLInputElement>('speed'),
   spacingHint: byId<HTMLParagraphElement>('spacing-hint'),
@@ -136,14 +120,10 @@ const ui = {
   exportCsv: byId<HTMLButtonElement>('export-csv'),
   importNmea: byId<HTMLButtonElement>('import-nmea'),
   importCsv: byId<HTMLButtonElement>('import-csv'),
-  saveProject: byId<HTMLButtonElement>('save-project'),
-  openProject: byId<HTMLButtonElement>('open-project'),
   undo: byId<HTMLButtonElement>('undo'),
   redo: byId<HTMLButtonElement>('redo'),
   clear: byId<HTMLButtonElement>('clear'),
   provider: byId<HTMLSelectElement>('provider'),
-  providerHint: byId<HTMLParagraphElement>('provider-hint'),
-  apiKey: byId<HTMLButtonElement>('api-key'),
   banner: byId<HTMLDivElement>('banner'),
   bannerText: byId<HTMLSpanElement>('banner-text'),
   bannerAction: byId<HTMLButtonElement>('banner-action'),
@@ -156,7 +136,7 @@ function initialize(): void {
   fillForm();
   bindEvents();
   setTool('add');
-  updateAll(true);
+  updateAll();
   void switchProvider(settings.provider, false);
   vscode.postMessage({ type: 'ready' });
 }
@@ -189,7 +169,7 @@ async function switchProvider(provider: MapProvider, announce = true): Promise<v
 
   if (effective === viewKind) {
     view?.setTileSource(hostSettings.tileUrl, hostSettings.tileAttribution);
-    updateProviderUi(provider, effective);
+    updateProviderUi(provider);
     if (failure && announce && hostReady) {
       showGoogleFailure(failure);
     }
@@ -214,7 +194,7 @@ async function switchProvider(provider: MapProvider, announce = true): Promise<v
   );
   viewKind = effective;
   render();
-  updateProviderUi(provider, effective);
+  updateProviderUi(provider);
 
   if (failure && announce) {
     showGoogleFailure(failure);
@@ -231,17 +211,9 @@ function showGoogleFailure(message: string): void {
   }
 }
 
-function updateProviderUi(configured: MapProvider, effective: MapProvider): void {
+function updateProviderUi(configured: MapProvider): void {
   settings.provider = configured;
   ui.provider.value = configured;
-  ui.providerHint.textContent =
-    effective === 'google' ? 'Google Maps · 浅色底图' : 'OpenStreetMap · 浅色底图';
-  if (configured === 'google' && effective !== 'google') {
-    ui.providerHint.textContent += '（未加载 Google，暂用 OSM）';
-  }
-  ui.apiKey.textContent = hostSettings.apiKey
-    ? '更新 Google Maps API Key'
-    : '设置 Google Maps API Key';
 }
 
 function chooseProvider(provider: MapProvider): void {
@@ -276,7 +248,7 @@ const mapHandlers: MapEventHandlers = {
     points[index] = { lat: latlng.lat, lon: latlng.lon };
     selectedIndex = index;
     preview = [];
-    updateAll(true);
+    updateAll();
   },
   pointerMove: handlePointerMove,
   tileError: () => {
@@ -301,7 +273,6 @@ function handleMapClick(latlng: LatLng): void {
       commitLine(latlng);
       break;
     case 'delete':
-    case 'edit':
     case 'move':
       selectedIndex = -1;
       preview = [];
@@ -320,10 +291,10 @@ function handlePointClick(index: number): void {
     deletePointAt(index);
     return;
   }
-  if (tool === 'move' || tool === 'edit') {
+  if (tool === 'move') {
     selectedIndex = index;
     preview = [];
-    updateAll(true);
+    updateAll();
   }
 }
 
@@ -350,7 +321,7 @@ function addPoint(latlng: LatLng): void {
   points.push({ lat: latlng.lat, lon: latlng.lon });
   selectedIndex = points.length - 1;
   preview = [];
-  updateAll(true);
+  updateAll();
 }
 
 function commitLine(target: LatLng): void {
@@ -372,7 +343,7 @@ function commitLine(target: LatLng): void {
   points.push(...generated);
   selectedIndex = points.length - 1;
   preview = [];
-  updateAll(true);
+  updateAll();
   showToast(`已添加 ${generated.length} 个等间距点。`);
 }
 
@@ -398,14 +369,8 @@ function deletePointAt(index: number): void {
   points.splice(index, 1);
   selectedIndex = points.length === 0 ? -1 : Math.min(index, points.length - 1);
   preview = [];
-  updateAll(true);
+  updateAll();
   showToast('已删除 1 个点，可撤销。');
-}
-
-function deleteSelectedPoint(): void {
-  if (selectedIndex >= 0) {
-    deletePointAt(selectedIndex);
-  }
 }
 
 function pushHistory(): void {
@@ -426,7 +391,7 @@ function undo(): void {
   points = previous;
   selectedIndex = points.length === 0 ? -1 : Math.min(selectedIndex, points.length - 1);
   preview = [];
-  updateAll(true);
+  updateAll();
 }
 
 function redo(): void {
@@ -438,7 +403,7 @@ function redo(): void {
   points = next;
   selectedIndex = points.length === 0 ? -1 : Math.min(selectedIndex, points.length - 1);
   preview = [];
-  updateAll(true);
+  updateAll();
 }
 
 function clearTrack(): void {
@@ -449,14 +414,13 @@ function clearTrack(): void {
   points = [];
   selectedIndex = -1;
   preview = [];
-  updateAll(true);
+  updateAll();
   showToast('已清空轨迹，可撤销。');
 }
 
-function updateAll(forcePointPanel = false): void {
+function updateAll(): void {
   render();
   updateStats();
-  updatePointPanel(forcePointPanel);
   updateNmeaHint();
   updateSpacingHint();
   updateHistoryButtons();
@@ -493,7 +457,7 @@ function updateStats(): void {
 function updateSpacingHint(): void {
   const spacing = spacingMeters(settings);
   ui.spacingHint.textContent =
-    `点间距 ${formatDistance(spacing)} · ${(settings.speedMps * 3.6).toFixed(1)} km/h · ` +
+    `点间距 ${formatDistance(spacing)} · ${settings.speedKmh.toFixed(1)} km/h · ` +
     `${settings.frequencyHz} Hz`;
 }
 
@@ -555,78 +519,6 @@ function formatDuration(seconds: number): string {
   return `${remaining} 秒`;
 }
 
-function updatePointPanel(force = false): void {
-  const valid = selectedIndex >= 0 && selectedIndex < points.length;
-  ui.pointLat.disabled = !valid;
-  ui.pointLon.disabled = !valid;
-  ui.applyPoint.disabled = !valid;
-  ui.deletePoint.disabled = !valid;
-  ui.prevPoint.disabled = points.length === 0;
-  ui.nextPoint.disabled = points.length === 0;
-
-  if (!valid) {
-    ui.pointTitle.textContent = points.length === 0 ? '尚未添加轨迹点' : '未选择点';
-    ui.pointMeta.textContent =
-      points.length === 0
-        ? '点击地图开始添加轨迹点。'
-        : '点击轨迹上的点进行选择；改坐标后按 Enter 或“应用坐标”。';
-    if (lastFilledIndex !== -1) {
-      ui.pointLat.value = '';
-      ui.pointLon.value = '';
-      lastFilledIndex = -1;
-    }
-    return;
-  }
-
-  const point = points[selectedIndex];
-  const time = pointTimeMs(settings, selectedIndex);
-  const speed = pointSpeedMps(points, selectedIndex, settings.frequencyHz);
-  const distance = pointDistanceMeters(points, selectedIndex);
-  const meta = [formatUtcStamp(time), `${(speed * 3.6).toFixed(1)} km/h`];
-  if (selectedIndex > 0) {
-    meta.push(`距上一点 ${formatDistance(distance)}`);
-  }
-  ui.pointTitle.textContent = `点 ${selectedIndex + 1} / ${points.length}`;
-  ui.pointMeta.textContent = meta.join(' · ');
-
-  if (force || lastFilledIndex !== selectedIndex) {
-    ui.pointLat.value = point.lat.toFixed(7);
-    ui.pointLon.value = point.lon.toFixed(7);
-    lastFilledIndex = selectedIndex;
-  }
-}
-
-function applyPointCoordinates(): void {
-  if (selectedIndex < 0 || selectedIndex >= points.length) {
-    return;
-  }
-  const lat = Number(ui.pointLat.value);
-  const lon = Number(ui.pointLon.value);
-  if (ui.pointLat.value.trim() === '' || ui.pointLon.value.trim() === '') {
-    showToast('请输入完整的纬度和经度。', true);
-    return;
-  }
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-    showToast('经纬度必须是数字。', true);
-    return;
-  }
-  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-    showToast('纬度范围 -90..90，经度范围 -180..180。', true);
-    return;
-  }
-  const current = points[selectedIndex];
-  if (Math.abs(current.lat - lat) < 1e-10 && Math.abs(current.lon - lon) < 1e-10) {
-    showToast('坐标未改变。');
-    return;
-  }
-
-  pushHistory();
-  points[selectedIndex] = { lat, lon };
-  preview = [];
-  updateAll(true);
-  showToast('已更新点坐标。');
-}
-
 function updateNmeaHint(): void {
   if (points.length === 0) {
     ui.nmeaHint.textContent = '尚未添加轨迹点。';
@@ -653,7 +545,7 @@ function updateNmeaHint(): void {
 
 function fillForm(): void {
   ui.frequency.value = String(settings.frequencyHz);
-  ui.speed.value = String(settings.speedMps);
+  ui.speed.value = String(settings.speedKmh);
   ui.startDate.value = settings.startDate;
   ui.startTime.value = settings.startTime;
   ui.talker.value = settings.talkerId;
@@ -722,15 +614,6 @@ function exportCsvFile(): void {
   });
 }
 
-function saveProjectFile(): void {
-  vscode.postMessage({
-    type: 'saveFile',
-    kind: 'project',
-    content: serializeProject(points, settings),
-    suggestedName: timestampedName('nmea-project', 'json')
-  });
-}
-
 function importNmeaFile(fileName: string, content: string): void {
   const result = parseNmeaTrack(content);
   if (result.points.length === 0) {
@@ -748,12 +631,12 @@ function importNmeaFile(fileName: string, content: string): void {
     settings.frequencyHz = clamp(roundTo(result.frequencyHz, 2), 0.1, 50);
   }
   if (result.speedMps !== null && result.speedMps > 0) {
-    settings.speedMps = clamp(roundTo(result.speedMps, 2), 0.01, 100);
+    settings.speedKmh = clamp(roundTo(result.speedMps * 3.6, 1), 0.1, 360);
   }
   selectedIndex = points.length - 1;
   preview = [];
   fillForm();
-  updateAll(true);
+  updateAll();
   fitView();
 
   const warning = result.warnings.length > 0 ? ` ${result.warnings.join(' ')}` : '';
@@ -771,34 +654,11 @@ function importCsvFile(fileName: string, content: string): void {
   points = result.points;
   selectedIndex = points.length - 1;
   preview = [];
-  updateAll(true);
+  updateAll();
   fitView();
 
   const warning = result.warnings.length > 0 ? ` ${result.warnings.join(' ')}` : '';
   showToast(`已从 ${fileName} 导入 ${points.length} 个点。${warning}`);
-}
-
-function openProjectFile(fileName: string, content: string): void {
-  const project = parseProject(content);
-  if (project === null) {
-    showToast(`${fileName} 不是有效的 NMEA GPS Generator 工程文件。`, true);
-    return;
-  }
-
-  pushHistory();
-  points = project.points;
-  settings = { ...project.settings, provider: hostSettings.provider };
-  selectedIndex =
-    project.selectedIndex >= 0
-      ? project.selectedIndex
-      : points.length > 0
-        ? points.length - 1
-        : -1;
-  preview = [];
-  fillForm();
-  updateAll(true);
-  fitView();
-  showToast(`已打开工程 ${fileName}（${points.length} 个点）。`);
 }
 
 function handleFileContent(kind: FileKind, fileName: string, content: string): void {
@@ -806,11 +666,7 @@ function handleFileContent(kind: FileKind, fileName: string, content: string): v
     importNmeaFile(fileName, content);
     return;
   }
-  if (kind === 'csv') {
-    importCsvFile(fileName, content);
-    return;
-  }
-  openProjectFile(fileName, content);
+  importCsvFile(fileName, content);
 }
 
 function fitView(): void {
@@ -861,13 +717,6 @@ function bindEvents(): void {
   ui.includeGsa.addEventListener('change', commitNmeaOptions);
   ui.includeRmc.addEventListener('change', commitNmeaOptions);
 
-  ui.pointLat.addEventListener('keydown', handlePointInputKey);
-  ui.pointLon.addEventListener('keydown', handlePointInputKey);
-  ui.applyPoint.addEventListener('click', applyPointCoordinates);
-  ui.deletePoint.addEventListener('click', deleteSelectedPoint);
-  ui.prevPoint.addEventListener('click', () => selectRelativePoint(-1));
-  ui.nextPoint.addEventListener('click', () => selectRelativePoint(1));
-
   ui.generate.addEventListener('click', generateAndSave);
   ui.copyNmea.addEventListener('click', copyNmea);
   ui.exportCsv.addEventListener('click', exportCsvFile);
@@ -877,10 +726,6 @@ function bindEvents(): void {
   ui.importCsv.addEventListener('click', () =>
     vscode.postMessage({ type: 'openFile', kind: 'csv' })
   );
-  ui.saveProject.addEventListener('click', saveProjectFile);
-  ui.openProject.addEventListener('click', () =>
-    vscode.postMessage({ type: 'openFile', kind: 'project' })
-  );
   ui.undo.addEventListener('click', undo);
   ui.redo.addEventListener('click', redo);
   ui.clear.addEventListener('click', clearTrack);
@@ -888,7 +733,6 @@ function bindEvents(): void {
   ui.provider.addEventListener('change', () => {
     chooseProvider(ui.provider.value === 'google' ? 'google' : 'osm');
   });
-  ui.apiKey.addEventListener('click', () => vscode.postMessage({ type: 'setApiKey' }));
 
   ui.bannerClose.addEventListener('click', hideBanner);
   ui.bannerAction.addEventListener('click', () => {
@@ -931,8 +775,8 @@ function commitSpeed(): void {
     fillForm();
     return;
   }
-  settings.speedMps = clamp(roundTo(value, 3), 0.01, 100);
-  ui.speed.value = String(settings.speedMps);
+  settings.speedKmh = clamp(roundTo(value, 1), 0.1, 360);
+  ui.speed.value = String(settings.speedKmh);
   preview = [];
   updateAll();
 }
@@ -969,26 +813,6 @@ function commitNmeaOptions(): void {
 function numberValue(input: HTMLInputElement, fallback: number): number {
   const value = Number(input.value);
   return Number.isFinite(value) && input.value.trim() !== '' ? value : fallback;
-}
-
-function handlePointInputKey(event: KeyboardEvent): void {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    applyPointCoordinates();
-  }
-}
-
-function selectRelativePoint(delta: number): void {
-  if (points.length === 0) {
-    return;
-  }
-  if (selectedIndex < 0) {
-    selectedIndex = delta < 0 ? points.length - 1 : 0;
-  } else {
-    selectedIndex = (selectedIndex + delta + points.length) % points.length;
-  }
-  preview = [];
-  updateAll(true);
 }
 
 function handleHostMessage(event: MessageEvent<HostToWebview>): void {
@@ -1031,11 +855,6 @@ function handleKeyDown(event: KeyboardEvent): void {
   if (modifier && event.key.toLowerCase() === 'y') {
     event.preventDefault();
     redo();
-    return;
-  }
-  if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIndex >= 0) {
-    event.preventDefault();
-    deleteSelectedPoint();
     return;
   }
   if (event.key === 'Escape') {

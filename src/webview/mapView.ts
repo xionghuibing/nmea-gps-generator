@@ -2,7 +2,7 @@ import type { LatLng, MapViewState } from '../shared/geo';
 
 declare const google: any;
 
-export type Tool = 'add' | 'delete' | 'move' | 'edit' | 'line' | 'pan';
+export type Tool = 'add' | 'delete' | 'move' | 'line' | 'pan';
 
 export interface MapRenderState {
   points: readonly LatLng[];
