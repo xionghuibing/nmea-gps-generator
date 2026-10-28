@@ -5,7 +5,7 @@ import {
   type LatLng
 } from '../shared/geo';
 
-export type TalkerId = 'GP' | 'GN' | 'GL' | 'GA';
+export type TalkerId = 'GP' | 'BD' | 'GL' | 'GA';
 
 export interface NmeaGenerationOptions {
   /** 每秒采样次数，例如 1 Hz 表示每点间隔 1 秒。 */

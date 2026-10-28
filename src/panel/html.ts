@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-/** 生成带 nonce 的 Webview HTML；底图固定浅色，因此不注入主题切换逻辑。 */
+/** 生成带 nonce 的 Webview HTML；OSM 固定浅色，Google 使用官方默认配色。 */
 export function renderHtml(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
@@ -46,13 +46,11 @@ export function renderHtml(
           <button class="tool" data-tool="line" title="从最后一个点向鼠标位置添加等间距点">⟋ 多点直线</button>
           <button class="tool" data-tool="pan" title="拖动、缩放地图，不添加点">✋ 浏览</button>
         </div>
-        <p class="tool-hint" id="tool-hint">点击地图追加轨迹点</p>
       </section>
 
       <section class="section">
         <h2>轨迹统计</h2>
         <div class="stats-grid" id="stats"></div>
-        <p class="hint" id="stats-hint"></p>
       </section>
 
       <section class="section">
@@ -65,7 +63,6 @@ export function renderHtml(
             <input id="speed" type="number" min="0.1" max="360" step="1" />
           </label>
         </div>
-        <p class="hint" id="spacing-hint"></p>
         <div class="field-row two">
           <label>UTC 开始日期
             <input id="start-date" type="date" />
@@ -74,16 +71,15 @@ export function renderHtml(
             <input id="start-time" type="time" step="1" />
           </label>
         </div>
-        <p class="hint">所有时间均为 UTC。改变频率后，NMEA 时间戳会按新频率重新计算。</p>
       </section>
 
       <section class="section">
         <h2>NMEA 输出</h2>
         <div class="field-row two">
-          <label>发话者 ID
+          <label>信号源 ID
             <select id="talker">
               <option value="GP">GP（GPS）</option>
-              <option value="GN">GN（多星座）</option>
+              <option value="BD">BD（北斗）</option>
               <option value="GL">GL（GLONASS）</option>
               <option value="GA">GA（Galileo）</option>
             </select>
@@ -105,7 +101,6 @@ export function renderHtml(
             <input id="hdop" type="number" min="0.1" max="99" step="0.1" />
           </label>
         </div>
-        <p class="hint" id="nmea-hint"></p>
       </section>
 
       <section class="section">
@@ -131,6 +126,14 @@ export function renderHtml(
           <select id="provider">
             <option value="osm">OpenStreetMap</option>
             <option value="google">Google Maps</option>
+          </select>
+        </label>
+        <label class="select-field" id="google-map-type-field" hidden>Google 地图类型
+          <select id="google-map-type">
+            <option value="roadmap">道路</option>
+            <option value="satellite">卫星</option>
+            <option value="terrain">地形</option>
+            <option value="hybrid">混合</option>
           </select>
         </label>
       </footer>

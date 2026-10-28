@@ -1,8 +1,8 @@
 {
   "name": "nmea-gps-generator",
   "displayName": "NMEA GPS Generator",
-  "description": "在 OpenStreetMap 或 Google 浅色地图上手动绘制 GPS 轨迹，并生成带校验和的 NMEA（GGA/GSA/RMC）日志与 CSV 坐标文件。",
-  "version": "0.2.0",
+  "description": "在 OpenStreetMap 或 Google 地图（道路/卫星/地形/混合）上手动绘制 GPS 轨迹，并生成带校验和的 NMEA（GGA/GSA/RMC）日志与 CSV 坐标文件。",
+  "version": "0.3.0",
   "publisher": "local-dev",
   "license": "MIT",
   "repository": {
@@ -95,7 +95,7 @@
             "Google Maps JavaScript API（需要 API Key 与结算账号）"
           ],
           "default": "osm",
-          "description": "底图提供商。两种底图都固定使用浅色模式。"
+          "description": "底图提供商。OSM 为浅色瓦片；Google 使用官方默认配色，可在界面上切换道路/卫星/地形/混合。"
         },
         "nmeaGen.tileUrl": {
           "type": "string",

@@ -171,22 +171,6 @@ button.wide {
   opacity: 0.65;
 }
 
-.tool-hint {
-  margin: 8px 0 0;
-  padding-left: 7px;
-  border-left: 2px solid var(--vscode-focusBorder);
-  font-size: 10.5px;
-  line-height: 1.5;
-  color: var(--vscode-descriptionForeground);
-}
-
-.hint {
-  margin: 6px 0 0;
-  font-size: 10.5px;
-  line-height: 1.55;
-  color: var(--vscode-descriptionForeground);
-}
-
 .field-row {
   display: flex;
   gap: 8px;

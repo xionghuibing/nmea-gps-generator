@@ -1,5 +1,5 @@
 import { clamp, haversineMeters, isValidLatLng, type LatLng } from '../shared/geo';
-import type { MapProvider } from '../shared/protocol';
+import type { GoogleMapType, MapProvider } from '../shared/protocol';
 import type { TalkerId } from '../nmea/generator';
 
 export interface Settings {
@@ -18,6 +18,8 @@ export interface Settings {
   satellites: number;
   hdop: number;
   provider: MapProvider;
+  /** Google 底图类型（道路/卫星/地形/混合），仅在 provider 为 google 时生效。 */
+  googleMapType: GoogleMapType;
 }
 
 export interface PersistedState {
@@ -26,7 +28,9 @@ export interface PersistedState {
   selectedIndex: number;
 }
 
-export const TALKER_IDS: TalkerId[] = ['GP', 'GN', 'GL', 'GA'];
+export const TALKER_IDS: TalkerId[] = ['GP', 'BD', 'GL', 'GA'];
+
+export const GOOGLE_MAP_TYPES: GoogleMapType[] = ['roadmap', 'satellite', 'terrain', 'hybrid'];
 
 export function createDefaultSettings(): Settings {
   const now = new Date();
@@ -42,7 +46,8 @@ export function createDefaultSettings(): Settings {
     altitudeMeters: 120,
     satellites: 8,
     hdop: 0.9,
-    provider: 'osm'
+    provider: 'osm',
+    googleMapType: 'roadmap'
   };
 }
 
@@ -177,6 +182,9 @@ function parseSettings(value: unknown): Settings | null {
   const raw = value as Record<string, unknown>;
 
   const provider: MapProvider = raw.provider === 'google' ? 'google' : 'osm';
+  const googleMapType: GoogleMapType = GOOGLE_MAP_TYPES.includes(raw.googleMapType as GoogleMapType)
+    ? (raw.googleMapType as GoogleMapType)
+    : defaults.googleMapType;
   const talkerId = TALKER_IDS.includes(raw.talkerId as TalkerId)
     ? (raw.talkerId as TalkerId)
     : defaults.talkerId;
@@ -206,7 +214,8 @@ function parseSettings(value: unknown): Settings | null {
     ),
     satellites: Math.round(clamp(numberOr(raw.satellites, defaults.satellites), 0, 32)),
     hdop: round(clamp(numberOr(raw.hdop, defaults.hdop), 0.1, 99), 1),
-    provider
+    provider,
+    googleMapType
   };
 }
 

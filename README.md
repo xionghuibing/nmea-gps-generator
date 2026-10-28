@@ -5,7 +5,7 @@
 在 VS Code 里手动绘制 GPS 轨迹，并生成带校验和的 **NMEA 0183** 日志（GGA / GSA / RMC）与 CSV 坐标文件。交互参考 [nmeagen.org](https://nmeagen.org/)，但完全运行在 VS Code Webview 中，方便为 GPS 仿真、日志回放、地图匹配等场景快速准备测试数据。
 
 - 底图默认 **OpenStreetMap（Leaflet，免 API Key）**，可切换 **Google Maps**。
-- 底图**固定浅色模式**，默认定位匈牙利布达佩斯（47.4979, 19.0402）。
+- OSM 为浅色瓦片；Google 使用 Google 地图默认配色，可在底图选框下方切换地图类型（道路/卫星/地形/混合）。默认定位匈牙利布达佩斯（47.4979, 19.0402）。
 - 常驻 **Activity Bar**：点击侧边栏图标即可打开，不占用编辑器标签页；视图拖动变宽后自动切回「表单 + 地图」双栏布局。
 - 轨迹点、速度、UTC 时间、NMEA 语句全部可调整；支持导入/导出 NMEA 与 CSV。
 
@@ -17,7 +17,7 @@
 - **微调位置**：在“移动点”模式下点击轨迹点选中它，再拖动橙色标记即可调整坐标。
 - **运动模型**：设置 GPS 频率（Hz）与对象速度（km/h，默认 50），自动得到点间距；多点直线工具按该间距生成等速轨迹。
 - **UTC 时间**：指定开始日期与时间，所有 NMEA 时间戳按 `1 / 频率` 递增。
-- **NMEA 输出**：GGA、GSA、RMC 可独立勾选；支持发话者 ID（GP/GN/GL/GA）、海拔、卫星数、HDOP。
+- **NMEA 输出**：GGA、GSA、RMC 可独立勾选；支持信号源 ID（GP/BD/GL/GA，其中 BD 为北斗）、海拔、卫星数、HDOP。
 - **校验和**：每条语句自动计算 `*XX` XOR 校验和，行尾使用 CRLF。
 - **导入/导出**：
   - 保存 / 复制 NMEA
@@ -122,7 +122,7 @@ https://tile.openstreetmap.org/{z}/{x}/{y}.png
 
 未配置 Key 或加载失败时，会显示提示并自动回退到 OpenStreetMap；Google 鉴权失败（Key 无效、未启用 API、未绑定结算）也会给出提示。
 
-底图只使用浅色样式：OSM 标准浅色瓦片，Google 使用内置浅色 roadmap 样式，不提供深色、卫星或地形切换。
+底图配色：OSM 使用标准浅色瓦片；Google 使用 Google Maps 官方默认配色（与 maps.google.com 一致），选择 Google 底图后可在下方切换 **道路 / 卫星 / 地形 / 混合**。
 
 ## 设置项
 
@@ -165,8 +165,8 @@ src/
   webview/
     main.ts               UI 状态、工具、导入导出、消息处理
     leafletView.ts        Leaflet 浅色地图
-    googleView.ts         Google 浅色地图
-    mapView.ts            地图接口、Google 加载器、浅色样式
+    googleView.ts         Google 地图（道路/卫星/地形/混合）
+    mapView.ts            地图接口与 Google 加载器
     settings.ts           默认设置、时间/速度计算、状态校验
   test/
     generator.test.ts     单元测试

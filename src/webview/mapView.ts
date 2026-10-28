@@ -1,3 +1,4 @@
+import type { GoogleMapType } from '../shared/protocol';
 import type { LatLng, MapViewState } from '../shared/geo';
 
 declare const google: any;
@@ -24,6 +25,8 @@ export interface MapEventHandlers {
 export interface MapInitOptions {
   tileUrl: string;
   tileAttribution: string;
+  /** Google 底图类型；Leaflet 视图忽略该值。 */
+  googleMapType?: GoogleMapType;
 }
 
 export interface MapView {
@@ -43,50 +46,14 @@ export interface MapView {
   renderPreview(points: readonly LatLng[], preview: readonly LatLng[]): void;
   fit(points: readonly LatLng[]): void;
   setTileSource(url: string, attribution: string): void;
+  /** 切换 Google 底图类型；Leaflet 视图为空实现。 */
+  setGoogleMapType(type: GoogleMapType): void;
   refreshTiles(): void;
   /** 面板尺寸变化时让地图重新计算可视区域。 */
   invalidateSize(): void;
 }
 
 export const BUDAPEST_ZOOM = 14;
-
-/**
- * Google Maps 的浅色样式。底图固定浅色，不提供深色/卫星/地形切换。
- */
-export const LIGHT_GOOGLE_STYLE: Array<Record<string, unknown>> = [
-  { elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
-  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f5f5' }] },
-  {
-    featureType: 'administrative.land_parcel',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#bdbdbd' }]
-  },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#eeeeee' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#e5e5e5' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-  {
-    featureType: 'road.arterial',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#757575' }]
-  },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#dadada' }] },
-  {
-    featureType: 'road.highway',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#616161' }]
-  },
-  {
-    featureType: 'road.local',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#9e9e9e' }]
-  },
-  { featureType: 'transit.line', elementType: 'geometry', stylers: [{ color: '#e5e5e5' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9c9c9' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#9e9e9e' }] }
-];
 
 let googleMapsPromise: Promise<void> | null = null;
 

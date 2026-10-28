@@ -1,3 +1,4 @@
+import type { GoogleMapType } from '../shared/protocol';
 import type { LatLng, MapViewState } from '../shared/geo';
 import type {
   MapEventHandlers,
@@ -5,12 +6,12 @@ import type {
   MapRenderState,
   MapView
 } from './mapView';
-import { LIGHT_GOOGLE_STYLE } from './mapView';
 
 declare const google: any;
 
 /**
- * Google Maps JavaScript API 视图。固定 roadmap + LIGHT_GOOGLE_STYLE（浅色）。
+ * Google Maps JavaScript API 视图。支持道路 / 卫星 / 地形 / 混合四种地图类型，
+ * 全部使用 Google 官方默认配色（与 maps.google.com 一致），不注入自定义样式。
  * 底图切换/瓦片刷新不适用于 Google，因此 setTileSource/refreshTiles 为空实现。
  */
 export class GoogleMapView implements MapView {
@@ -24,27 +25,27 @@ export class GoogleMapView implements MapView {
   private previewOverlays: any[] = [];
   private listeners: any[] = [];
   private markerListeners: any[] = [];
+  private mapTypeId: GoogleMapType = 'roadmap';
 
   public init(
     container: HTMLElement,
     center: LatLng,
     zoom: number,
-    _options: MapInitOptions,
+    options: MapInitOptions,
     handlers: MapEventHandlers
   ): void {
     this.container = container;
     this.handlers = handlers;
+    this.mapTypeId = options.googleMapType ?? 'roadmap';
     this.map = new google.maps.Map(container, {
       center: { lat: center.lat, lng: center.lon },
       zoom,
-      mapTypeId: 'roadmap',
-      styles: LIGHT_GOOGLE_STYLE,
+      mapTypeId: this.mapTypeId,
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
       clickableIcons: false,
-      gestureHandling: 'greedy',
-      backgroundColor: '#f5f5f5'
+      gestureHandling: 'greedy'
     });
     this.listeners.push(this.map.addListener('click', (event: any) => this.onMapClick(event)));
     this.listeners.push(
@@ -83,7 +84,14 @@ export class GoogleMapView implements MapView {
   }
 
   public setTileSource(_url: string, _attribution: string): void {
-    // Google 底图样式固定，忽略 OSM 瓦片配置。
+    // Google 底图由 JS API 自行渲染，忽略 OSM 瓦片配置。
+  }
+
+  public setGoogleMapType(type: GoogleMapType): void {
+    this.mapTypeId = type;
+    if (this.map) {
+      this.map.setOptions({ mapTypeId: type });
+    }
   }
 
   public refreshTiles(): void {
@@ -362,4 +370,3 @@ function dotIcon(color: string, scale: number): any {
     strokeWeight: 2
   };
 }
-

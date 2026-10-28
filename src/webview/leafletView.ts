@@ -93,6 +93,10 @@ export class LeafletMapView implements MapView {
     });
   }
 
+  public setGoogleMapType(): void {
+    // Leaflet 使用 OSM 瓦片，没有 Google 地图类型的概念。
+  }
+
   public refreshTiles(): void {
     this.tileErrorReported = false;
     this.tileLayer?.redraw();

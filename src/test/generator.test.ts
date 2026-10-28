@@ -195,6 +195,48 @@ test('持久化状态会过滤非法点并校正选中索引', () => {
   assert.equal(restored.selectedIndex, -1);
 });
 
+test('支持北斗（BD）信号源并生成 BD 前缀语句', () => {
+  const content = generateNmea([BUDAPEST_A, BUDAPEST_B], {
+    ...baseOptions,
+    talkerId: 'BD'
+  });
+  const lines = content.trim().split('\r\n');
+  assert.equal(sentenceFields(lines[0])[0], 'BDGGA');
+  assert.equal(sentenceFields(lines[1])[0], 'BDGSA');
+  assert.equal(sentenceFields(lines[2])[0], 'BDRMC');
+  lines.forEach(assertValidChecksum);
+  assert.equal(parseNmeaTrack(content).points.length, 2);
+});
+
+test('旧的 GN 信号源设置会回退为 GP', () => {
+  const restored = parsePersistedState({
+    points: [],
+    settings: { talkerId: 'GN' },
+    selectedIndex: -1
+  });
+  assert.ok(restored !== null);
+  assert.equal(restored.settings.talkerId, 'GP');
+});
+
+test('持久化状态保留并校验 Google 地图类型', () => {
+  const restored = parsePersistedState({
+    points: [],
+    settings: { provider: 'google', googleMapType: 'satellite' },
+    selectedIndex: -1
+  });
+  assert.ok(restored !== null);
+  assert.equal(restored.settings.provider, 'google');
+  assert.equal(restored.settings.googleMapType, 'satellite');
+
+  const fallback = parsePersistedState({
+    points: [],
+    settings: { provider: 'google', googleMapType: 'dark' },
+    selectedIndex: -1
+  });
+  assert.ok(fallback !== null);
+  assert.equal(fallback.settings.googleMapType, 'roadmap');
+});
+
 test('大圆距离、方位角与等间距取点', () => {
   const equator = { lat: 0, lon: 0 };
   const oneDegreeEast = { lat: 0, lon: 1 };

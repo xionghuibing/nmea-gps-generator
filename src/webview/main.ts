@@ -12,6 +12,7 @@ import {
 } from '../shared/geo';
 import type {
   FileKind,
+  GoogleMapType,
   HostSettings,
   HostToWebview,
   MapProvider,
@@ -29,6 +30,7 @@ import {
 } from './mapView';
 import {
   createDefaultSettings,
+  GOOGLE_MAP_TYPES,
   parsePersistedState,
   parseUtcDateTime,
   spacingMeters,
@@ -52,14 +54,6 @@ declare global {
     gm_authFailure?: () => void;
   }
 }
-
-const TOOL_HINTS: Record<Tool, string> = {
-  add: '点击地图在轨迹末尾追加点',
-  delete: '点击轨迹点将其删除',
-  move: '点击轨迹点选中，然后拖动橙色标记调整位置',
-  line: '从最后一个点开始：移动鼠标预览，点击地图添加等间距点',
-  pan: '拖动 / 滚轮浏览地图，不会添加点'
-};
 
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -99,12 +93,9 @@ const ui = {
   map: byId<HTMLDivElement>('map'),
   mapStatus: byId<HTMLDivElement>('map-status'),
   toolGrid: byId<HTMLDivElement>('tool-grid'),
-  toolHint: byId<HTMLParagraphElement>('tool-hint'),
   stats: byId<HTMLDivElement>('stats'),
-  statsHint: byId<HTMLParagraphElement>('stats-hint'),
   frequency: byId<HTMLInputElement>('frequency'),
   speed: byId<HTMLInputElement>('speed'),
-  spacingHint: byId<HTMLParagraphElement>('spacing-hint'),
   startDate: byId<HTMLInputElement>('start-date'),
   startTime: byId<HTMLInputElement>('start-time'),
   talker: byId<HTMLSelectElement>('talker'),
@@ -114,7 +105,6 @@ const ui = {
   includeGga: byId<HTMLInputElement>('include-gga'),
   includeGsa: byId<HTMLInputElement>('include-gsa'),
   includeRmc: byId<HTMLInputElement>('include-rmc'),
-  nmeaHint: byId<HTMLParagraphElement>('nmea-hint'),
   generate: byId<HTMLButtonElement>('generate'),
   copyNmea: byId<HTMLButtonElement>('copy-nmea'),
   exportCsv: byId<HTMLButtonElement>('export-csv'),
@@ -124,6 +114,8 @@ const ui = {
   redo: byId<HTMLButtonElement>('redo'),
   clear: byId<HTMLButtonElement>('clear'),
   provider: byId<HTMLSelectElement>('provider'),
+  googleMapTypeField: byId<HTMLLabelElement>('google-map-type-field'),
+  googleMapType: byId<HTMLSelectElement>('google-map-type'),
   banner: byId<HTMLDivElement>('banner'),
   bannerText: byId<HTMLSpanElement>('banner-text'),
   bannerAction: byId<HTMLButtonElement>('banner-action'),
@@ -189,7 +181,11 @@ async function switchProvider(provider: MapProvider, announce = true): Promise<v
     ui.map,
     center,
     zoom,
-    { tileUrl: hostSettings.tileUrl, tileAttribution: hostSettings.tileAttribution },
+    {
+      tileUrl: hostSettings.tileUrl,
+      tileAttribution: hostSettings.tileAttribution,
+      googleMapType: settings.googleMapType
+    },
     mapHandlers
   );
   viewKind = effective;
@@ -214,14 +210,30 @@ function showGoogleFailure(message: string): void {
 function updateProviderUi(configured: MapProvider): void {
   settings.provider = configured;
   ui.provider.value = configured;
+  updateGoogleMapTypeUi(configured);
+}
+
+/** Google 地图类型只对 Google 底图有意义，选 OSM 时隐藏。 */
+function updateGoogleMapTypeUi(provider: MapProvider): void {
+  ui.googleMapTypeField.hidden = provider !== 'google';
+  ui.googleMapType.value = settings.googleMapType;
 }
 
 function chooseProvider(provider: MapProvider): void {
   settings.provider = provider;
   ui.provider.value = provider;
+  updateGoogleMapTypeUi(provider);
   persist();
   vscode.postMessage({ type: 'setProvider', provider });
   void switchProvider(provider);
+}
+
+function commitGoogleMapType(): void {
+  const value = ui.googleMapType.value as GoogleMapType;
+  settings.googleMapType = GOOGLE_MAP_TYPES.includes(value) ? value : 'roadmap';
+  ui.googleMapType.value = settings.googleMapType;
+  view?.setGoogleMapType(settings.googleMapType);
+  persist();
 }
 
 function handleHostSettings(incoming: HostSettings): void {
@@ -355,10 +367,6 @@ function updatePreview(target: LatLng): void {
   }
   preview = linePoints(points[points.length - 1], target, spacingMeters(settings));
   view?.renderPreview(points, preview);
-  ui.toolHint.textContent =
-    preview.length > 0
-      ? `预览 ${preview.length} 个点 · 点击地图提交`
-      : '移动鼠标预览等间距点，点击提交';
 }
 
 function deletePointAt(index: number): void {
@@ -421,8 +429,6 @@ function clearTrack(): void {
 function updateAll(): void {
   render();
   updateStats();
-  updateNmeaHint();
-  updateSpacingHint();
   updateHistoryButtons();
   updateMapStatus();
   persist();
@@ -448,17 +454,6 @@ function updateStats(): void {
     statCard('时长', formatDuration(duration)),
     statCard('平均速度', `${(averageSpeed * 3.6).toFixed(1)} km/h`)
   ].join('');
-  ui.statsHint.textContent =
-    points.length > 1
-      ? `${settings.frequencyHz} Hz 采样 · 轨迹越密，NMEA 文件越大`
-      : '添加至少两个点即可计算距离与速度。';
-}
-
-function updateSpacingHint(): void {
-  const spacing = spacingMeters(settings);
-  ui.spacingHint.textContent =
-    `点间距 ${formatDistance(spacing)} · ${settings.speedKmh.toFixed(1)} km/h · ` +
-    `${settings.frequencyHz} Hz`;
 }
 
 function updateMapStatus(): void {
@@ -466,7 +461,7 @@ function updateMapStatus(): void {
   ui.mapStatus.textContent =
     lastPointer && isValidLatLng(lastPointer)
       ? `${lastPointer.lat.toFixed(5)}, ${lastPointer.lon.toFixed(5)} · ${suffix}`
-      : `布达佩斯 · 浅色底图 · ${suffix}`;
+      : `布达佩斯 · ${settings.provider === 'google' ? 'Google 地图' : 'OpenStreetMap'} · ${suffix}`;
 }
 
 function updateHistoryButtons(): void {
@@ -482,7 +477,6 @@ function setTool(next: Tool): void {
   )) {
     button.classList.toggle('active', button.dataset.tool === tool);
   }
-  ui.toolHint.textContent = TOOL_HINTS[tool];
   render();
 }
 
@@ -519,30 +513,6 @@ function formatDuration(seconds: number): string {
   return `${remaining} 秒`;
 }
 
-function updateNmeaHint(): void {
-  if (points.length === 0) {
-    ui.nmeaHint.textContent = '尚未添加轨迹点。';
-    return;
-  }
-  const sentences: string[] = [];
-  if (settings.includeGga) {
-    sentences.push('GGA');
-  }
-  if (settings.includeGsa) {
-    sentences.push('GSA');
-  }
-  if (settings.includeRmc) {
-    sentences.push('RMC');
-  }
-  if (sentences.length === 0) {
-    ui.nmeaHint.textContent = '请至少选择 GGA / GSA / RMC 中的一种语句。';
-    return;
-  }
-  ui.nmeaHint.textContent =
-    `每点输出 ${sentences.join(' + ')}，共 ${points.length} 个点 → ` +
-    `${points.length * sentences.length} 条语句。`;
-}
-
 function fillForm(): void {
   ui.frequency.value = String(settings.frequencyHz);
   ui.speed.value = String(settings.speedKmh);
@@ -556,6 +526,7 @@ function fillForm(): void {
   ui.satellites.value = String(settings.satellites);
   ui.hdop.value = String(settings.hdop);
   ui.provider.value = settings.provider;
+  updateGoogleMapTypeUi(settings.provider);
 }
 
 function buildNmea(): string | null {
@@ -733,6 +704,7 @@ function bindEvents(): void {
   ui.provider.addEventListener('change', () => {
     chooseProvider(ui.provider.value === 'google' ? 'google' : 'osm');
   });
+  ui.googleMapType.addEventListener('change', commitGoogleMapType);
 
   ui.bannerClose.addEventListener('click', hideBanner);
   ui.bannerAction.addEventListener('click', () => {
