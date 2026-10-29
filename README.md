@@ -7,7 +7,7 @@
 - 底图默认 **OpenStreetMap（Leaflet，免 API Key）**，可切换 **Google Maps**。
 - OSM 为浅色瓦片；Google 使用 Google 地图默认配色，可在底图选框下方切换地图类型（道路/卫星/地形/混合）。默认定位匈牙利布达佩斯（47.4979, 19.0402）。
 - 常驻 **Activity Bar**：点击侧边栏图标即可打开，不占用编辑器标签页；视图拖动变宽后自动切回「表单 + 地图」双栏布局。
-- 轨迹点、速度、UTC 时间、NMEA 语句全部可调整；支持导入/导出 NMEA 与 CSV。
+- 轨迹点、速度、UTC 时间、NMEA 语句全部可调整；支持保存 NMEA 文件，导入 NMEA 与 CSV。
 
 > 本项目生成的是**合成数据**，仅用于开发与测试，不适用于真实导航、测绘或定位取证。
 
@@ -20,10 +20,10 @@
 - **NMEA 输出**：GGA、GSA、RMC 可独立勾选；支持信号源 ID（GP/BD/GL/GA，其中 BD 为北斗）、海拔、卫星数、HDOP。
 - **校验和**：每条语句自动计算 `*XX` XOR 校验和，行尾使用 CRLF。
 - **导入/导出**：
-  - 保存 / 复制 NMEA
-  - 导出 / 导入 CSV（`latitude,longitude`，可带第三列海拔）
+  - 生成并保存 NMEA 文件
+  - 导入 CSV（`latitude,longitude`，可带第三列海拔）
   - 导入 NMEA（GGA / RMC，校验和错误会跳过并提示）
-- **撤销 / 重做**、清空轨迹、轨迹统计（点数、长度、时长、平均速度）。
+- **撤销 / 重做**、清空轨迹、轨迹统计（点数、时长、距离、起止时间、平均与最高速度、海拔、卫星数）。
 - Webview 会记住轨迹与设置；关闭视图、切换侧边栏或重启 VS Code 后再次打开仍会恢复。需要长期保存时请生成 NMEA / CSV 文件。
 
 ## 快速开始
@@ -40,7 +40,7 @@ npm install
 
 ```bash
 npx @vscode/vsce package
-code --install-extension nmea-gps-generator-0.2.0.vsix
+code --install-extension nmea-gps-generator-0.4.0.vsix
 ```
 
 ## 使用说明
@@ -51,7 +51,7 @@ code --install-extension nmea-gps-generator-0.2.0.vsix
 2. 切换到“多点直线”，鼠标移动时会显示等间距预览，点击地图提交。预览间距 = 速度 ÷ 频率（速度按 km/h 换算为 m/s）。
 3. “移动点”模式下点击轨迹点选中它，再拖动橙色标记，松开后写回坐标。
 4. “删除点”模式点击轨迹点即可删除。
-5. 顶部统计实时显示点数、路径长度、时长与平均速度；`Cmd/Ctrl+Z` 撤销，`Shift+Cmd/Ctrl+Z` 重做。
+5. 顶部统计实时显示点数、时长、距离、起止时间、平均/最高速度、海拔与卫星数；`Cmd/Ctrl+Z` 撤销，`Shift+Cmd/Ctrl+Z` 重做。
 
 ### 时间与速度
 
@@ -87,8 +87,6 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A
 | 操作 | 说明 |
 | --- | --- |
 | 生成 NMEA 文件… | 选择保存位置，扩展直接写入文件，可选择立即打开 |
-| 复制 NMEA | 将完整 NMEA 文本写入系统剪贴板 |
-| 导出 CSV… | 表头 `latitude,longitude`，每行 7 位小数 |
 | 导入 NMEA… | 优先使用 GGA 坐标，日期取 RMC；自动恢复起始时间与频率 |
 | 导入 CSV… | 支持逗号/分号/制表符/空格分隔，自动跳过表头与无效行 |
 

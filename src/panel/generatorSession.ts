@@ -19,7 +19,7 @@ const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
 /**
  * 承载单个 Webview（活动栏侧边栏视图）的宿主逻辑。
  *
- * 与展示形式无关的部分（文件读写、剪贴板、配置同步）都放在这里，
+ * 与展示形式无关的部分（文件读写、配置同步）都放在这里，
  * 视图提供者只负责创建/销毁 Webview 与 HTML。
  */
 export class GeneratorSession {
@@ -69,10 +69,6 @@ export class GeneratorSession {
           break;
         case 'openFile':
           await this.openFile(message.kind);
-          break;
-        case 'copy':
-          await vscode.env.clipboard.writeText(message.text);
-          void vscode.window.showInformationMessage(`已复制${message.label}到剪贴板。`);
           break;
         case 'setProvider':
           await vscode.workspace

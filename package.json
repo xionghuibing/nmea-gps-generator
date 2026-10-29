@@ -2,7 +2,7 @@
   "name": "nmea-gps-generator",
   "displayName": "NMEA GPS Generator",
   "description": "在 OpenStreetMap 或 Google 地图（道路/卫星/地形/混合）上手动绘制 GPS 轨迹，并生成带校验和的 NMEA（GGA/GSA/RMC）日志与 CSV 坐标文件。",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "local-dev",
   "license": "MIT",
   "repository": {

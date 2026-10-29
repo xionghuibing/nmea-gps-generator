@@ -23,7 +23,7 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider, vscode
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media')]
     };
-    webviewView.description = '绘制轨迹 · 生成 NMEA / CSV';
+    webviewView.description = '绘制轨迹 · 生成 NMEA';
 
     // 先创建 session（注册消息监听），再加载 HTML，避免错过 webview 的 ready。
     this.session = new GeneratorSession(webview);

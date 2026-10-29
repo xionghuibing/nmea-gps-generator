@@ -23,6 +23,8 @@ export class GoogleMapView implements MapView {
   private state: MapRenderState = { points: [], selectedIndex: -1, tool: 'add', preview: [] };
   private overlays: any[] = [];
   private previewOverlays: any[] = [];
+  /** 多点直线预览点的圆点池，鼠标移动时复用，避免每帧创建/销毁大量 Marker。 */
+  private previewDots: any[] = [];
   private listeners: any[] = [];
   private markerListeners: any[] = [];
   private mapTypeId: GoogleMapType = 'roadmap';
@@ -55,6 +57,7 @@ export class GoogleMapView implements MapView {
 
   public destroy(): void {
     this.clearOverlays();
+    this.previewDots = [];
     for (const listener of this.listeners) {
       google.maps.event.removeListener(listener);
     }
@@ -259,15 +262,40 @@ export class GoogleMapView implements MapView {
       );
     }
 
-    const lastPreview = state.preview[state.preview.length - 1];
-    this.addPreview(
-      new google.maps.Marker({
-        map: this.map,
-        position: { lat: lastPreview.lat, lng: lastPreview.lon },
-        icon: dotIcon('#64748b', 5),
-        clickable: false
-      })
-    );
+    // 与 Leaflet 视图一致：沿虚线显示等间距的预览点，点数过多时抽稀以保持流畅。
+    this.syncPreviewDots(state.preview);
+  }
+
+  /** 复用圆点池更新预览点位置；多余的点先隐藏而不是销毁。 */
+  private syncPreviewDots(preview: readonly LatLng[]): void {
+    if (!this.map) {
+      return;
+    }
+    const step = Math.max(1, Math.ceil(preview.length / 200));
+    let used = 0;
+    for (let i = 0; i < preview.length; i += step) {
+      const point = preview[i];
+      const position = { lat: point.lat, lng: point.lon };
+      const dot = this.previewDots[used];
+      if (dot) {
+        dot.setPosition(position);
+        dot.setMap(this.map);
+      } else {
+        this.previewDots.push(
+          new google.maps.Marker({
+            map: this.map,
+            position,
+            icon: previewDotIcon(),
+            clickable: false,
+            optimized: true
+          })
+        );
+      }
+      used++;
+    }
+    for (let i = used; i < this.previewDots.length; i++) {
+      this.previewDots[i].setMap(null);
+    }
   }
 
   private onMapClick(event: any): void {
@@ -345,6 +373,10 @@ export class GoogleMapView implements MapView {
       overlay.setMap(null);
     }
     this.previewOverlays = [];
+    // 圆点保留在池中以便复用，只从地图上移除。
+    for (const dot of this.previewDots) {
+      dot.setMap(null);
+    }
   }
 
   private clearOverlays(): void {
@@ -368,5 +400,17 @@ function dotIcon(color: string, scale: number): any {
     fillOpacity: 1,
     strokeColor: '#ffffff',
     strokeWeight: 2
+  };
+}
+
+/** 多点直线预览圆点：与 Leaflet 的 circleMarker（半径 3、浅灰填充、深灰描边）保持一致。 */
+function previewDotIcon(): any {
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    scale: 3,
+    fillColor: '#e2e8f0',
+    fillOpacity: 0.9,
+    strokeColor: '#475569',
+    strokeWeight: 1
   };
 }

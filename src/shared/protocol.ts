@@ -29,7 +29,6 @@ export type WebviewToHost =
   | { type: 'ready' }
   | { type: 'saveFile'; kind: FileKind; content: string; suggestedName: string }
   | { type: 'openFile'; kind: FileKind }
-  | { type: 'copy'; text: string; label: string }
   | { type: 'setProvider'; provider: MapProvider }
   | { type: 'setApiKey' }
   | { type: 'openSettings' }

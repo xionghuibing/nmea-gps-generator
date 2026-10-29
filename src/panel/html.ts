@@ -107,10 +107,6 @@ export function renderHtml(
         <h2>导入 / 导出</h2>
         <button id="generate" class="primary wide">生成 NMEA 文件…</button>
         <div class="button-row two-buttons">
-          <button id="copy-nmea">复制 NMEA</button>
-          <button id="export-csv">导出 CSV…</button>
-        </div>
-        <div class="button-row two-buttons">
           <button id="import-nmea">导入 NMEA…</button>
           <button id="import-csv">导入 CSV…</button>
         </div>

@@ -1,6 +1,6 @@
 /* global acquireVsCodeApi */
 import { generateNmea, type TalkerId } from '../nmea/generator';
-import { exportCsv, parseCsvCoordinates, parseNmeaTrack } from '../nmea/parse';
+import { parseCsvCoordinates, parseNmeaTrack } from '../nmea/parse';
 import {
   BUDAPEST,
   clamp,
@@ -33,6 +33,7 @@ import {
   GOOGLE_MAP_TYPES,
   parsePersistedState,
   parseUtcDateTime,
+  pointSpeedMps,
   spacingMeters,
   startEpochMs,
   TALKER_IDS,
@@ -106,8 +107,6 @@ const ui = {
   includeGsa: byId<HTMLInputElement>('include-gsa'),
   includeRmc: byId<HTMLInputElement>('include-rmc'),
   generate: byId<HTMLButtonElement>('generate'),
-  copyNmea: byId<HTMLButtonElement>('copy-nmea'),
-  exportCsv: byId<HTMLButtonElement>('export-csv'),
   importNmea: byId<HTMLButtonElement>('import-nmea'),
   importCsv: byId<HTMLButtonElement>('import-csv'),
   undo: byId<HTMLButtonElement>('undo'),
@@ -448,11 +447,21 @@ function updateStats(): void {
     points.length > 1 ? (points.length - 1) / Math.max(0.01, settings.frequencyHz) : 0;
   const averageSpeed = duration > 0 ? totalDistance / duration : 0;
 
+  // 每段耗时相同，因此段速度直接用「段距离 × 频率」计算，取最大值即最高速度。
+  let maxSpeed = 0;
+  for (let i = 1; i < points.length; i++) {
+    maxSpeed = Math.max(maxSpeed, pointSpeedMps(points, i, settings.frequencyHz));
+  }
+
   ui.stats.innerHTML = [
-    statCard('点数', String(points.length)),
-    statCard('路径长度', formatDistance(totalDistance)),
-    statCard('时长', formatDuration(duration)),
-    statCard('平均速度', `${(averageSpeed * 3.6).toFixed(1)} km/h`)
+    statCard('点数', String(points.length), 'third'),
+    statCard('时长', formatDuration(duration), 'third'),
+    statCard('距离', formatDistance(totalDistance), 'third'),
+    statCard('时间', formatTimeRange(duration), 'wide'),
+    statCard('平均速度', `${(averageSpeed * 3.6).toFixed(1)} km/h`, 'half'),
+    statCard('最高速度', `${(maxSpeed * 3.6).toFixed(1)} km/h`, 'half'),
+    statCard('海拔', formatAltitude(settings.altitudeMeters), 'half'),
+    statCard('卫星数', String(settings.satellites), 'half')
   ].join('');
 }
 
@@ -480,11 +489,15 @@ function setTool(next: Tool): void {
   render();
 }
 
-function statCard(label: string, value: string): string {
+type StatSize = 'third' | 'half' | 'wide';
+
+/** 统计卡片：标签在上、数值在下，尺寸对应网格列宽（1/3、1/2、整行）。 */
+function statCard(label: string, value: string, size: StatSize = 'third'): string {
+  const sizeClass = size === 'third' ? '' : ` ${size}`;
   return (
-    `<div class="stat">` +
-    `<span class="stat-value">${value}</span>` +
+    `<div class="stat${sizeClass}">` +
     `<span class="stat-label">${label}</span>` +
+    `<span class="stat-value">${value}</span>` +
     `</div>`
   );
 }
@@ -496,7 +509,24 @@ function formatDistance(meters: number): string {
   if (meters < 1000) {
     return `${meters.toFixed(meters < 10 ? 2 : 1)} m`;
   }
-  return `${(meters / 1000).toFixed(3)} km`;
+  return `${(meters / 1000).toFixed(2)} km`;
+}
+
+/** 轨迹起止的 UTC 时间（时:分:秒），与生成的 NMEA 时间一致。 */
+function formatTimeRange(durationSeconds: number): string {
+  if (points.length === 0) {
+    return '—';
+  }
+  const start = startEpochMs(settings);
+  const end = start + Math.max(0, durationSeconds) * 1000;
+  return `${utcTimeString(start)} - ${utcTimeString(end)} UTC`;
+}
+
+function formatAltitude(meters: number): string {
+  if (!Number.isFinite(meters)) {
+    return '0 m';
+  }
+  return `${Number.isInteger(meters) ? meters : meters.toFixed(1)} m`;
 }
 
 function formatDuration(seconds: number): string {
@@ -561,27 +591,6 @@ function generateAndSave(): void {
     kind: 'nmea',
     content,
     suggestedName: timestampedName('nmea-track', 'nmea')
-  });
-}
-
-function copyNmea(): void {
-  const content = buildNmea();
-  if (content === null) {
-    return;
-  }
-  vscode.postMessage({ type: 'copy', text: content, label: ' NMEA 语句' });
-}
-
-function exportCsvFile(): void {
-  if (points.length === 0) {
-    showToast('请先在地图上添加轨迹点。', true);
-    return;
-  }
-  vscode.postMessage({
-    type: 'saveFile',
-    kind: 'csv',
-    content: exportCsv(points),
-    suggestedName: timestampedName('nmea-track', 'csv')
   });
 }
 
@@ -689,8 +698,6 @@ function bindEvents(): void {
   ui.includeRmc.addEventListener('change', commitNmeaOptions);
 
   ui.generate.addEventListener('click', generateAndSave);
-  ui.copyNmea.addEventListener('click', copyNmea);
-  ui.exportCsv.addEventListener('click', exportCsvFile);
   ui.importNmea.addEventListener('click', () =>
     vscode.postMessage({ type: 'openFile', kind: 'nmea' })
   );

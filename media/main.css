@@ -148,7 +148,8 @@ button.wide {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* 6 列栅格：1/3 宽卡片占 2 列，1/2 宽卡片占 3 列，整行卡片占 6 列。 */
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -156,19 +157,35 @@ button.wide {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  grid-column: span 2;
+  min-width: 0;
   padding: 7px 8px;
   border-radius: 5px;
   background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
 }
 
+.stat.half {
+  grid-column: span 3;
+}
+
+.stat.wide {
+  grid-column: span 6;
+}
+
+/* 标签在上、数值在下；窄卡片里的长数值用省略号收尾，避免撑破侧边栏。 */
+.stat-label {
+  font-size: 10px;
+  line-height: 1.3;
+  opacity: 0.65;
+}
+
 .stat-value {
   font-size: 13px;
   font-weight: 600;
-}
-
-.stat-label {
-  font-size: 10px;
-  opacity: 0.65;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .field-row {
