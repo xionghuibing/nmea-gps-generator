@@ -31,12 +31,16 @@ export class LeafletMapView implements MapView {
     handlers: MapEventHandlers
   ): void {
     this.handlers = handlers;
-    this.map = L.map(container, {
-      zoomControl: true,
+    const map = L.map(container, {
+      zoomControl: false,
       attributionControl: true,
       worldCopyJump: true,
       preferCanvas: true
     }).setView([center.lat, center.lon], zoom);
+    this.map = map;
+
+    // 缩放按钮放到右下角：左上角留给搜索框，同时与 Google 底图的控件位置保持一致。
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     this.setTileSource(options.tileUrl, options.tileAttribution);
     this.trackLayer = L.layerGroup().addTo(this.map);
@@ -91,10 +95,6 @@ export class LeafletMapView implements MapView {
         this.handlers?.tileError?.();
       }
     });
-  }
-
-  public setGoogleMapType(): void {
-    // Leaflet 使用 OSM 瓦片，没有 Google 地图类型的概念。
   }
 
   public refreshTiles(): void {

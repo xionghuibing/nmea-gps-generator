@@ -8,17 +8,19 @@ import {
   isValidLatLng,
   linePoints,
   pathLength,
+  zoomForScale,
   type LatLng
 } from '../shared/geo';
 import type {
   FileKind,
-  GoogleMapType,
   HostSettings,
   HostToWebview,
   MapProvider,
   WebviewToHost
 } from '../shared/protocol';
+import { parseCoordinateInput } from '../shared/coords';
 import { DEFAULT_TILE_ATTRIBUTION, DEFAULT_TILE_URL } from '../shared/tiles';
+import { searchPlaces, type PlaceResult } from './geocode';
 import { GoogleMapView } from './googleView';
 import { LeafletMapView } from './leafletView';
 import {
@@ -30,7 +32,6 @@ import {
 } from './mapView';
 import {
   createDefaultSettings,
-  GOOGLE_MAP_TYPES,
   parsePersistedState,
   parseUtcDateTime,
   pointSpeedMps,
@@ -89,10 +90,15 @@ let pendingPointer: LatLng | null = null;
 let pointerFrame = 0;
 let toastTimer = 0;
 let bannerAction: (() => void) | null = null;
+let searchAbort: AbortController | null = null;
 
 const ui = {
   map: byId<HTMLDivElement>('map'),
   mapStatus: byId<HTMLDivElement>('map-status'),
+  mapSearch: byId<HTMLFormElement>('map-search'),
+  mapSearchInput: byId<HTMLInputElement>('map-search-input'),
+  mapSearchGo: byId<HTMLButtonElement>('map-search-go'),
+  mapSearchResults: byId<HTMLDivElement>('map-search-results'),
   toolGrid: byId<HTMLDivElement>('tool-grid'),
   stats: byId<HTMLDivElement>('stats'),
   frequency: byId<HTMLInputElement>('frequency'),
@@ -112,9 +118,7 @@ const ui = {
   undo: byId<HTMLButtonElement>('undo'),
   redo: byId<HTMLButtonElement>('redo'),
   clear: byId<HTMLButtonElement>('clear'),
-  provider: byId<HTMLSelectElement>('provider'),
-  googleMapTypeField: byId<HTMLLabelElement>('google-map-type-field'),
-  googleMapType: byId<HTMLSelectElement>('google-map-type'),
+  basemapSwitch: byId<HTMLDivElement>('basemap-switch'),
   banner: byId<HTMLDivElement>('banner'),
   bannerText: byId<HTMLSpanElement>('banner-text'),
   bannerAction: byId<HTMLButtonElement>('banner-action'),
@@ -182,8 +186,7 @@ async function switchProvider(provider: MapProvider, announce = true): Promise<v
     zoom,
     {
       tileUrl: hostSettings.tileUrl,
-      tileAttribution: hostSettings.tileAttribution,
-      googleMapType: settings.googleMapType
+      tileAttribution: hostSettings.tileAttribution
     },
     mapHandlers
   );
@@ -208,31 +211,25 @@ function showGoogleFailure(message: string): void {
 
 function updateProviderUi(configured: MapProvider): void {
   settings.provider = configured;
-  ui.provider.value = configured;
-  updateGoogleMapTypeUi(configured);
+  updateBasemapUi(configured);
 }
 
-/** Google 地图类型只对 Google 底图有意义，选 OSM 时隐藏。 */
-function updateGoogleMapTypeUi(provider: MapProvider): void {
-  ui.googleMapTypeField.hidden = provider !== 'google';
-  ui.googleMapType.value = settings.googleMapType;
+/** 高亮当前底图对应的分段按钮。 */
+function updateBasemapUi(provider: MapProvider): void {
+  const options = ui.basemapSwitch.querySelectorAll<HTMLButtonElement>('.basemap-option');
+  options.forEach((option) => {
+    const active = option.dataset.provider === provider;
+    option.classList.toggle('active', active);
+    option.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
 }
 
 function chooseProvider(provider: MapProvider): void {
   settings.provider = provider;
-  ui.provider.value = provider;
-  updateGoogleMapTypeUi(provider);
+  updateBasemapUi(provider);
   persist();
   vscode.postMessage({ type: 'setProvider', provider });
   void switchProvider(provider);
-}
-
-function commitGoogleMapType(): void {
-  const value = ui.googleMapType.value as GoogleMapType;
-  settings.googleMapType = GOOGLE_MAP_TYPES.includes(value) ? value : 'roadmap';
-  ui.googleMapType.value = settings.googleMapType;
-  view?.setGoogleMapType(settings.googleMapType);
-  persist();
 }
 
 function handleHostSettings(incoming: HostSettings): void {
@@ -470,7 +467,114 @@ function updateMapStatus(): void {
   ui.mapStatus.textContent =
     lastPointer && isValidLatLng(lastPointer)
       ? `${lastPointer.lat.toFixed(5)}, ${lastPointer.lon.toFixed(5)} · ${suffix}`
-      : `布达佩斯 · ${settings.provider === 'google' ? 'Google 地图' : 'OpenStreetMap'} · ${suffix}`;
+      : `${settings.provider === 'google' ? 'Google 地图' : 'OpenStreetMap'} · ${suffix}`;
+}
+
+/**
+ * 地图左上角搜索框：先按坐标解析，失败后再走地址检索。
+ * 坐标可以离线识别，地址检索依赖 Photon；两者最终都只做「移动地图」，不修改轨迹。
+ */
+async function runMapSearch(): Promise<void> {
+  const query = ui.mapSearchInput.value.trim();
+  if (query === '') {
+    ui.mapSearchInput.focus();
+    return;
+  }
+
+  const coordinate = parseCoordinateInput(query);
+  if (coordinate !== null) {
+    cancelPendingSearch();
+    hideSearchResults();
+    focusLocation(coordinate);
+    showToast(`已定位到 ${coordinate.lat.toFixed(5)}, ${coordinate.lon.toFixed(5)}。`);
+    return;
+  }
+
+  cancelPendingSearch();
+  const controller = new AbortController();
+  searchAbort = controller;
+  setSearchBusy(true);
+  try {
+    const results = await searchPlaces(query, controller.signal);
+    if (controller.signal.aborted) {
+      return;
+    }
+    if (results.length === 0) {
+      hideSearchResults();
+      showToast(`未找到「${query}」，请换一个更具体的地址，或直接输入坐标。`, true);
+      return;
+    }
+    if (results.length === 1) {
+      hideSearchResults();
+      focusLocation(results[0].center);
+      showToast(`已定位到 ${results[0].label}。`);
+      return;
+    }
+    showSearchResults(results);
+  } catch (error) {
+    if (isAbortError(error)) {
+      return;
+    }
+    hideSearchResults();
+    showToast(error instanceof Error ? error.message : '地址检索失败，请直接输入坐标。', true);
+  } finally {
+    if (searchAbort === controller) {
+      searchAbort = null;
+      setSearchBusy(false);
+    }
+  }
+}
+
+/**
+ * 把地图移动到目标坐标，并放大到约 50 m 的比例尺（100 px 刻度，约 0.5 m/像素），
+ * 缩放级别按纬度补偿，确保街道级细节可见。
+ */
+function focusLocation(center: LatLng): void {
+  if (!isValidLatLng(center)) {
+    return;
+  }
+  view?.setView(center, zoomForScale(center.lat));
+  lastPointer = null;
+  updateMapStatus();
+}
+
+function showSearchResults(results: readonly PlaceResult[]): void {
+  ui.mapSearchResults.innerHTML = '';
+  for (const result of results) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'map-search-result';
+    button.textContent = result.label;
+    button.title = result.label;
+    button.addEventListener('click', () => {
+      hideSearchResults();
+      focusLocation(result.center);
+    });
+    ui.mapSearchResults.appendChild(button);
+  }
+  ui.mapSearchResults.hidden = false;
+}
+
+function hideSearchResults(): void {
+  ui.mapSearchResults.hidden = true;
+  ui.mapSearchResults.textContent = '';
+}
+
+function setSearchBusy(busy: boolean): void {
+  ui.mapSearchGo.disabled = busy;
+  ui.mapSearchGo.classList.toggle('busy', busy);
+  ui.mapSearchGo.textContent = busy ? '…' : '🔍';
+}
+
+/** 取消仍在进行的地址检索，避免旧结果覆盖新的定位。 */
+function cancelPendingSearch(): void {
+  searchAbort?.abort();
+  searchAbort = null;
+  setSearchBusy(false);
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
 }
 
 function updateHistoryButtons(): void {
@@ -555,8 +659,7 @@ function fillForm(): void {
   ui.altitude.value = String(settings.altitudeMeters);
   ui.satellites.value = String(settings.satellites);
   ui.hdop.value = String(settings.hdop);
-  ui.provider.value = settings.provider;
-  updateGoogleMapTypeUi(settings.provider);
+  updateBasemapUi(settings.provider);
 }
 
 function buildNmea(): string | null {
@@ -708,10 +811,34 @@ function bindEvents(): void {
   ui.redo.addEventListener('click', redo);
   ui.clear.addEventListener('click', clearTrack);
 
-  ui.provider.addEventListener('change', () => {
-    chooseProvider(ui.provider.value === 'google' ? 'google' : 'osm');
+  ui.basemapSwitch.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const option = target.closest<HTMLButtonElement>('.basemap-option');
+    const provider = option?.dataset.provider;
+    if (provider === 'google' || provider === 'osm') {
+      chooseProvider(provider);
+    }
   });
-  ui.googleMapType.addEventListener('change', commitGoogleMapType);
+
+  ui.mapSearch.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void runMapSearch();
+  });
+  ui.mapSearchInput.addEventListener('input', hideSearchResults);
+  ui.mapSearchInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      hideSearchResults();
+    }
+  });
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (target instanceof Node && !ui.mapSearch.contains(target)) {
+      hideSearchResults();
+    }
+  });
 
   ui.bannerClose.addEventListener('click', hideBanner);
   ui.bannerAction.addEventListener('click', () => {
@@ -840,6 +967,7 @@ function handleKeyDown(event: KeyboardEvent): void {
     preview = [];
     render();
     hideBanner();
+    hideSearchResults();
   }
 }
 

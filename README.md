@@ -4,8 +4,8 @@
 
 在 VS Code 里手动绘制 GPS 轨迹，并生成带校验和的 **NMEA 0183** 日志（GGA / GSA / RMC）与 CSV 坐标文件。交互参考 [nmeagen.org](https://nmeagen.org/)，但完全运行在 VS Code Webview 中，方便为 GPS 仿真、日志回放、地图匹配等场景快速准备测试数据。
 
-- 底图默认 **OpenStreetMap（Leaflet，免 API Key）**，可切换 **Google Maps**。
-- OSM 为浅色瓦片；Google 使用 Google 地图默认配色，可在底图选框下方切换地图类型（道路/卫星/地形/混合）。默认定位匈牙利布达佩斯（47.4979, 19.0402）。
+- 底图默认 **OpenStreetMap（Leaflet，免 API Key）**，可在地图右上角的 OSM / Google 按钮间切换。
+- OSM 为浅色瓦片；Google 使用 Google 地图官方默认配色。默认定位匈牙利布达佩斯（47.4979, 19.0402）。
 - 常驻 **Activity Bar**：点击侧边栏图标即可打开，不占用编辑器标签页；视图拖动变宽后自动切回「表单 + 地图」双栏布局。
 - 轨迹点、速度、UTC 时间、NMEA 语句全部可调整；支持保存 NMEA 文件，导入 NMEA 与 CSV。
 
@@ -14,6 +14,7 @@
 ## 功能
 
 - **绘制工具**：添加点、删除点、移动点、等间距多点直线、浏览/平移。
+- **地图搜索**：地图左上角搜索框，输入「纬度, 经度」坐标或地址即可把地图移动到目标位置；OSM 与 Google 底图都可用。
 - **微调位置**：在“移动点”模式下点击轨迹点选中它，再拖动橙色标记即可调整坐标。
 - **运动模型**：设置 GPS 频率（Hz）与对象速度（km/h，默认 50），自动得到点间距；多点直线工具按该间距生成等速轨迹。
 - **UTC 时间**：指定开始日期与时间，所有 NMEA 时间戳按 `1 / 频率` 递增。
@@ -40,7 +41,7 @@ npm install
 
 ```bash
 npx @vscode/vsce package
-code --install-extension nmea-gps-generator-0.4.0.vsix
+code --install-extension nmea-gps-generator-0.5.0.vsix
 ```
 
 ## 使用说明
@@ -52,6 +53,14 @@ code --install-extension nmea-gps-generator-0.4.0.vsix
 3. “移动点”模式下点击轨迹点选中它，再拖动橙色标记，松开后写回坐标。
 4. “删除点”模式点击轨迹点即可删除。
 5. 顶部统计实时显示点数、时长、距离、起止时间、平均/最高速度、海拔与卫星数；`Cmd/Ctrl+Z` 撤销，`Shift+Cmd/Ctrl+Z` 重做。
+
+### 定位到指定位置
+
+地图左上角的搜索框同时支持坐标与地址：
+
+- **坐标**：直接输入 `47.4979, 19.0402`（纬度在前、经度在后），也接受 `47.4979N 19.0402E`、`纬度: 47.4979 经度: 19.0402`、`东经116.3913 北纬39.9074` 以及度分秒写法 `47°29'52.4"N 19°2'24.7"E`。坐标解析在本地完成，无需联网。
+- **地址**：输入地名或详细地址后回车（或点击 🔍）。地址检索使用基于 OpenStreetMap 的 [Photon](https://photon.komoot.io/) 开放服务，无需 API Key；有多个候选时会在搜索框下方列出，点选即可跳转。该服务需要联网，与当前底图是 OSM 还是 Google 无关。
+- 跳转只移动地图，并自动放大到约 50 m 的比例尺（100 px 刻度，即约 0.5 m/像素，缩放级别按纬度自动补偿），不会修改已绘制的轨迹点。
 
 ### 时间与速度
 
@@ -120,7 +129,9 @@ https://tile.openstreetmap.org/{z}/{x}/{y}.png
 
 未配置 Key 或加载失败时，会显示提示并自动回退到 OpenStreetMap；Google 鉴权失败（Key 无效、未启用 API、未绑定结算）也会给出提示。
 
-底图配色：OSM 使用标准浅色瓦片；Google 使用 Google Maps 官方默认配色（与 maps.google.com 一致），选择 Google 底图后可在下方切换 **道路 / 卫星 / 地形 / 混合**。
+底图配色：OSM 使用标准浅色瓦片；Google 使用 Google Maps 官方默认配色（与 maps.google.com 一致）。
+
+底图切换：地图右上角的 **OSM / Google** 分段按钮，当前底图以蓝色高亮；点击即切换并记住选择（写入 `nmeaGen.mapProvider`）。
 
 ## 设置项
 
@@ -163,7 +174,7 @@ src/
   webview/
     main.ts               UI 状态、工具、导入导出、消息处理
     leafletView.ts        Leaflet 浅色地图
-    googleView.ts         Google 地图（道路/卫星/地形/混合）
+    googleView.ts         Google 地图
     mapView.ts            地图接口与 Google 加载器
     settings.ts           默认设置、时间/速度计算、状态校验
   test/

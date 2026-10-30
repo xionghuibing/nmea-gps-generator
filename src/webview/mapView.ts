@@ -1,4 +1,3 @@
-import type { GoogleMapType } from '../shared/protocol';
 import type { LatLng, MapViewState } from '../shared/geo';
 
 declare const google: any;
@@ -25,8 +24,6 @@ export interface MapEventHandlers {
 export interface MapInitOptions {
   tileUrl: string;
   tileAttribution: string;
-  /** Google 底图类型；Leaflet 视图忽略该值。 */
-  googleMapType?: GoogleMapType;
 }
 
 export interface MapView {
@@ -46,8 +43,6 @@ export interface MapView {
   renderPreview(points: readonly LatLng[], preview: readonly LatLng[]): void;
   fit(points: readonly LatLng[]): void;
   setTileSource(url: string, attribution: string): void;
-  /** 切换 Google 底图类型；Leaflet 视图为空实现。 */
-  setGoogleMapType(type: GoogleMapType): void;
   refreshTiles(): void;
   /** 面板尺寸变化时让地图重新计算可视区域。 */
   invalidateSize(): void;

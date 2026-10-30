@@ -116,28 +116,26 @@ export function renderHtml(
           <button id="clear" class="danger">清空</button>
         </div>
       </section>
-
-      <footer class="sidebar-footer">
-        <label class="select-field">底图
-          <select id="provider">
-            <option value="osm">OpenStreetMap</option>
-            <option value="google">Google Maps</option>
-          </select>
-        </label>
-        <label class="select-field" id="google-map-type-field" hidden>Google 地图类型
-          <select id="google-map-type">
-            <option value="roadmap">道路</option>
-            <option value="satellite">卫星</option>
-            <option value="terrain">地形</option>
-            <option value="hybrid">混合</option>
-          </select>
-        </label>
-      </footer>
     </aside>
 
     <main id="map-pane">
       <div id="map"></div>
-      <div class="map-status" id="map-status">布达佩斯 · 点击地图开始</div>
+      <div class="basemap-switch" id="basemap-switch" role="group" aria-label="切换底图">
+        <button type="button" class="basemap-option active" data-provider="osm" aria-pressed="true">OSM</button>
+        <button type="button" class="basemap-option" data-provider="google" aria-pressed="false">Google</button>
+      </div>
+      <form class="map-search" id="map-search" autocomplete="off" role="search">
+        <input
+          id="map-search-input"
+          type="search"
+          placeholder="输入坐标或地址，如 47.4979, 19.0402"
+          aria-label="搜索坐标或地址"
+          spellcheck="false"
+        />
+        <button id="map-search-go" class="map-search-go" type="submit" title="定位到该位置" aria-label="定位">🔍</button>
+        <div class="map-search-results" id="map-search-results" hidden></div>
+      </form>
+      <div class="map-status" id="map-status">OpenStreetMap · 0 个点</div>
       <div class="banner" id="banner" hidden>
         <span id="banner-text"></span>
         <div class="banner-actions">

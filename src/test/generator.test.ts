@@ -10,12 +10,14 @@ import {
   type NmeaGenerationOptions
 } from '../nmea/generator';
 import { exportCsv, parseCsvCoordinates, parseNmeaTrack } from '../nmea/parse';
+import { parseCoordinateInput } from '../shared/coords';
 import {
   bearingDegrees,
   destinationPoint,
   haversineMeters,
   linePoints,
-  pathLength
+  pathLength,
+  zoomForScale
 } from '../shared/geo';
 import { parsePersistedState } from '../webview/settings';
 
@@ -218,23 +220,88 @@ test('旧的 GN 信号源设置会回退为 GP', () => {
   assert.equal(restored.settings.talkerId, 'GP');
 });
 
-test('持久化状态保留并校验 Google 地图类型', () => {
+test('持久化状态保留并校验底图提供商', () => {
   const restored = parsePersistedState({
     points: [],
-    settings: { provider: 'google', googleMapType: 'satellite' },
+    settings: { provider: 'google' },
     selectedIndex: -1
   });
   assert.ok(restored !== null);
   assert.equal(restored.settings.provider, 'google');
-  assert.equal(restored.settings.googleMapType, 'satellite');
 
   const fallback = parsePersistedState({
     points: [],
-    settings: { provider: 'google', googleMapType: 'dark' },
+    settings: { provider: 'bing' },
     selectedIndex: -1
   });
   assert.ok(fallback !== null);
-  assert.equal(fallback.settings.googleMapType, 'roadmap');
+  assert.equal(fallback.settings.provider, 'osm');
+});
+
+test('解析搜索框坐标输入', () => {
+  assert.deepEqual(parseCoordinateInput('47.4979, 19.0402'), { lat: 47.4979, lon: 19.0402 });
+  assert.deepEqual(parseCoordinateInput('47.4979 19.0402'), { lat: 47.4979, lon: 19.0402 });
+  assert.deepEqual(parseCoordinateInput('47.4979,19.0402'), { lat: 47.4979, lon: 19.0402 });
+  assert.deepEqual(parseCoordinateInput('19.0402E 47.4979N'), {
+    lat: 47.4979,
+    lon: 19.0402
+  });
+  assert.deepEqual(parseCoordinateInput('N47.4979 E19.0402'), { lat: 47.4979, lon: 19.0402 });
+  assert.deepEqual(parseCoordinateInput('47.4979N, 19.0402E'), { lat: 47.4979, lon: 19.0402 });
+  assert.deepEqual(parseCoordinateInput('纬度: 47.4979 经度: 19.0402'), {
+    lat: 47.4979,
+    lon: 19.0402
+  });
+  assert.deepEqual(parseCoordinateInput('东经116.3913 北纬39.9074'), {
+    lat: 39.9074,
+    lon: 116.3913
+  });
+  assert.deepEqual(parseCoordinateInput('-33.8688, 151.2093'), {
+    lat: -33.8688,
+    lon: 151.2093
+  });
+
+  const dms = parseCoordinateInput('47°29\'52.4"N 19°2\'24.7"E');
+  assert.ok(dms !== null);
+  assert.ok(Math.abs(dms.lat - 47.4978889) < 1e-6);
+  assert.ok(Math.abs(dms.lon - 19.0401944) < 1e-6);
+
+  const spacedDms = parseCoordinateInput('N 47° 29′ 52.4″ E 19° 2′ 24.7″');
+  assert.ok(spacedDms !== null);
+  assert.ok(Math.abs(spacedDms.lat - 47.4978889) < 1e-6);
+  assert.ok(Math.abs(spacedDms.lon - 19.0401944) < 1e-6);
+
+  assert.equal(parseCoordinateInput('91, 19'), null);
+  assert.equal(parseCoordinateInput('47.4979'), null);
+  // 三个及以上数字更可能是地址门牌，不做猜测（度分秒只要带符号仍是一个分量）。
+  assert.equal(parseCoordinateInput('47 29 52.4 19 2 24.7'), null);
+  assert.equal(parseCoordinateInput('1087 Budapest, Baross tér 1'), null);
+  assert.equal(parseCoordinateInput(''), null);
+});
+
+test('定位缩放级别对应约 50 m 比例尺', () => {
+  // 比例尺按 100 px 宽度绘制，50 m 对应约 0.5 m/像素。
+  const metersPerPixel = (lat: number, zoom: number): number =>
+    (156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom;
+
+  for (const lat of [0, 23.5, 39.9074, 47.4979, 60, -33.8688]) {
+    const zoom = zoomForScale(lat);
+    assert.ok(zoom >= 14 && zoom <= 19, `纬度 ${lat} 应落在街道级缩放：${zoom}`);
+    const resolution = metersPerPixel(lat, zoom);
+    assert.ok(
+      resolution >= 0.5 && resolution < 1,
+      `纬度 ${lat} 的 ${zoom} 级应约为 0.5–1 m/像素：${resolution}`
+    );
+  }
+
+  // 赤道处墨卡托投影不收缩，比高纬度地区多放大一级。
+  assert.equal(zoomForScale(0), 18);
+  assert.equal(zoomForScale(47.4979), 17);
+  assert.equal(zoomForScale(60), 17);
+  // 超出墨卡托可用纬度时按 ±85° 计算，避免数值退化。
+  assert.equal(zoomForScale(90), zoomForScale(85));
+  // 目标比例尺超出瓦片最大级别时，收敛到 19 级。
+  assert.equal(zoomForScale(0, 0.5), 19);
 });
 
 test('大圆距离、方位角与等间距取点', () => {

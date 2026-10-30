@@ -138,6 +138,23 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+/** Web 墨卡托（256 px 瓦片）在 zoom 0 时赤道处的地面分辨率（米/像素）。 */
+const WEB_MERCATOR_METERS_PER_PIXEL_AT_ZOOM_0 = 156543.03392;
+
+/**
+ * 计算让地图比例尺约为 `scaleMeters / scalePixels`（默认 50 m / 100 px）的整数缩放级别。
+ * Web 墨卡托的地面分辨率随纬度按 cos(lat) 收缩，因此高纬度地区使用更小的缩放级别。
+ * 结果向下取整，使比例尺刻度条不超过给定像素宽度，且尽量显示 50 m 这一整刻度。
+ */
+export function zoomForScale(latitude: number, scaleMeters = 50, scalePixels = 100): number {
+  const metersPerPixel = Math.max(scaleMeters, 1e-6) / Math.max(scalePixels, 1);
+  const latRad = toRadians(clamp(latitude, -85, 85));
+  const idealZoom = Math.log2(
+    (WEB_MERCATOR_METERS_PER_PIXEL_AT_ZOOM_0 * Math.cos(latRad)) / metersPerPixel
+  );
+  return clamp(Math.floor(idealZoom), 1, 19);
+}
+
 export function clonePoints(points: readonly LatLng[]): LatLng[] {
   return points.map((point) => ({ lat: point.lat, lon: point.lon }));
 }

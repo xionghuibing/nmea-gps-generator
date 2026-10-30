@@ -1,8 +1,5 @@
 export type MapProvider = 'osm' | 'google';
 
-/** Google Maps 的内置地图类型；仅 provider 为 google 时生效。 */
-export type GoogleMapType = 'roadmap' | 'satellite' | 'terrain' | 'hybrid';
-
 export type FileKind = 'nmea' | 'csv';
 
 export interface HostSettings {
